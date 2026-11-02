@@ -1,0 +1,120 @@
+# Vehicle Gate ANPR – Android / Android TV
+
+Reads vehicle number plates from one or more **RTSP CCTV cameras**, compares the readings from every camera to decide the single most accurate plate for each vehicle, and shows the **vehicle number, date and entry time** on a TV dashboard.
+
+Runs on an **Android TV box / Android TV / Fire TV-class stick (Android 7.0+)** connected to the display, or on any Android tablet in landscape. Everything happens on the device: no cloud, no server, no Google Play Services needed.
+
+```
+ Cam 1 ─┐   RTSP → motion gate → frame grab → OCR → Indian-plate validation/correction ─┐
+ Cam 2 ─┼──────────────────────────────────────────────────────────────────────────────┼─► Fusion engine ─► SQLite log ─► TV screen
+ Cam N ─┘                                                                                │   (per-vehicle
+                                                                                         │    weighted vote)
+```
+
+---
+
+## 1. Build the APK
+
+1. Install **Android Studio** (Koala / 2024.1 or newer).
+2. *File → Open* → select the `VehicleGateANPR` folder. Let Gradle sync (it downloads AGP 8.5, Media3, ML Kit, Room).
+3. *Build → Build App Bundle(s) / APK(s) → Build APK(s)*.
+   Output: `app/build/outputs/apk/debug/app-debug.apk`
+
+Command line alternative: `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk`
+(release is signed with the debug key so it can be side-loaded; add your own keystore for production).
+
+Unit tests for the plate parser and multi-camera fusion: `./gradlew test`
+
+## 2. Install on the TV box
+
+* Enable *Developer options → USB debugging* (or *Network debugging*) on the box, then
+  `adb connect <box-ip>` and `adb install -r app-release.apk`, **or**
+* copy the APK to a USB stick and install with a file manager ("Install unknown apps" must be allowed).
+
+The app appears in the TV launcher as **Vehicle Gate ANPR**.
+
+## 3. Add cameras
+
+Press **⚙ Settings** (or the **MENU** key on the remote).
+
+* **+ Add camera** – one RTSP URL per camera.
+* **+ Add NVR channels** – one template for an NVR/DVR plus a channel list, e.g. `1-4` or `1,3,5`.
+
+| Brand | Main stream URL |
+|---|---|
+| Hikvision / Hilook (camera) | `rtsp://admin:PASS@192.168.1.64:554/Streaming/Channels/101` |
+| Hikvision NVR, channel N | `rtsp://admin:PASS@NVR-IP:554/Streaming/Channels/N01` → template `.../Channels/{ch}01` |
+| Dahua / CP Plus / Imou | `rtsp://admin:PASS@IP:554/cam/realmonitor?channel=1&subtype=0` → template `channel={ch}&subtype=0` |
+| Uniview | `rtsp://admin:PASS@IP:554/unicast/c1/s0/live` |
+| Generic ONVIF | check the camera's ONVIF "stream URI" |
+
+* If the password contains `@ # : / ?` URL-encode it (`@` → `%40`, `#` → `%23`).
+* Use the **main stream** (sub-stream resolution is too low for plates).
+* Per camera you can set:
+  * **Plate search area** (% left/top/right/bottom) – restrict OCR to the lane so signboards, stickers and parked vehicles aren't read.
+  * **Motion trigger** – OCR runs only while something moves in the search area (saves CPU). Choose *Off* to scan continuously.
+  * **TCP transport** – keep on unless your camera only supports UDP.
+
+Live tiles at the bottom of the TV screen show each camera with a status dot (green live / amber connecting / red offline, auto-reconnecting) and the last raw read.
+
+## 4. What the TV shows
+
+* **Latest entry** – plate rendered as a number plate, entry **date** and **time** (the moment the first camera saw the vehicle), snapshot with the plate boxed, confidence, and a per-camera comparison:
+  ```
+  ✔ Gate Cam 1      TN 09 AB 1234    92%  ×3
+  ✔ Gate Cam 2      TN 09 AB 1234    71%  ×2
+  ✘ Gate Cam 3      TN 09 AB 7234    60%  ×1
+  ```
+* **Recent entries** – last 50 vehicles with date and time.
+* **Today: N** counter and a live clock.
+* Optional beep on every new entry.
+
+History is kept in an on-device database (default 30 days, configurable). *Settings → Export history (CSV)* writes a CSV to the box's **Downloads** folder.
+
+## 5. How "best result from multiple cameras" works
+
+1. **Per frame** – ML Kit OCR finds text; every line, every run of words on a line, and every pair of stacked lines (two-line plates) is tested against Indian formats: `TN 09 AB 1234`, `KA 01 A 1234`, `DL 3C AB 1234`, Bharat series `22 BH 1234 AA`. The HSRP `IND` strip is ignored.
+2. **Position-aware correction** – a character is only allowed to be a letter where the format needs a letter, and a digit where it needs a digit: `O→0`, `8→B`, `B→8`, `5→S`, `Z→2`, `1→I`… State codes are checked against the real list (TN, KA, MH, …), so `7N` is fixed to `TN` and `XX…` is rejected. Each read gets a score = OCR confidence × format fit.
+3. **Tracking** – reads from *all* cameras that are within 1–2 characters of each other are grouped as the same vehicle.
+4. **Decision** – once no camera has seen the vehicle for the *decision delay* (default 2.5 s), every read from every camera votes character by character, weighted by its score. The candidate best supported by the evidence (and still a valid plate) wins. A vehicle needs ≥ 2 reads (or one very confident read) and the minimum confidence.
+5. **De-duplication** – the same plate is not logged again while it is still at the gate or within the re-entry cooldown (default 120 s).
+
+## 6. Tuning
+
+| Setting | Default | Raise it if… | Lower it if… |
+|---|---|---|---|
+| Re-entry cooldown | 120 s | the same car is logged twice | genuine re-entries are missed |
+| Minimum reads | 2 | random text gets logged | fast vehicles are missed |
+| Decision delay | 2500 ms | one vehicle is split into two entries | the screen updates too slowly |
+| OCR interval | 400 ms | the box is overloaded / UI stutters | fast vehicles are missed |
+| Minimum confidence | 45 % | wrong plates are logged | real plates are rejected |
+
+## 7. Camera & hardware tips (these matter more than any setting)
+
+* Mount cameras so the plate is **≥ 130 px wide** in the image, facing the plate within ~30°.
+* Set shutter to **1/500 s or faster** (or the camera's "LPR / ANPR / road" scene mode) to stop motion blur; use IR for night.
+* Set the stream to **H.264** (Hikvision "H.265+" / Dahua "Smart Codec" often break Android decoders).
+* Make vehicles slow down (speed breaker / boom barrier) in front of the cameras.
+* TV box: Android 9+, 4 GB RAM, Amlogic S905X3/X4 or better (e.g. Nvidia Shield, Mi Box S, Fire TV Stick 4K Max). Most boxes can hardware-decode **2–4** 1080p streams at once; with more cameras, use 720p main streams.
+* Keep the app in the foreground on the TV – the dashboard is the processing pipeline. The screen is kept on automatically. To start it after power cuts, set it as the box's launcher/kiosk app or use the box's "autostart" option.
+
+## 8. Project layout
+
+```
+app/src/main/java/com/vehiclegate/anpr/
+  core/IndianPlateParser.kt    plate format validation + OCR correction      (pure Kotlin, unit-tested)
+  core/PlateFusionEngine.kt    multi-camera tracking, voting, de-duplication (pure Kotlin, unit-tested)
+  ocr/PlateRecognizer.kt       ML Kit OCR → plate candidates
+  camera/CameraStream.kt       Media3 RTSP player, motion gate, frame grab, auto-reconnect
+  AnprPipeline.kt              wires cameras → OCR → fusion → database
+  data/                        Room DB (entries) + settings/camera config
+  ui/MainActivity.kt           TV dashboard
+  ui/SettingsActivity.kt       cameras, NVR channels, tuning, CSV export
+app/src/test/.../AnprCoreTest.kt
+```
+
+## 9. Known limits / next steps
+
+* Text OCR on the whole search area works well when plates are reasonably large and sharp. For long-range or very busy scenes, add a dedicated plate-detector model (e.g. a YOLO plate model in TFLite) in front of `PlateRecognizer` and OCR only the detected crops.
+* Non-standard plates (fancy fonts, military, diplomatic "CD/UN") are not recognised by design.
+* Exit-gate logging (entry/exit pairing) and a web/remote view are not included.

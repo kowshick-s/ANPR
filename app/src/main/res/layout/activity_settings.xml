@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Settings"
+            android:textColor="@color/text"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <!-- Cameras -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CAMERAS (RTSP)"
+                android:textColor="@color/accent"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Add every camera that sees the entry lane. Reads from all cameras are compared to pick the most accurate plate. 2–4 cameras recommended."
+                android:textColor="@color/text_dim"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cameraList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/addCamera"
+                    style="@style/TvButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ Add camera" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/addNvr"
+                    style="@style/TvButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="+ Add NVR channels" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Detection -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DISPLAY &amp; DETECTION"
+                android:textColor="@color/accent"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site / gate name)" />
+            <EditText android:id="@+id/siteTitle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Re-entry cooldown (seconds) – same vehicle within this time is not logged again" />
+            <EditText android:id="@+id/cooldown" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minimum reads to accept a vehicle (across all cameras)" />
+            <EditText android:id="@+id/minReads" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Decision delay (ms) – wait this long after the last read before deciding" />
+            <EditText android:id="@+id/settle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="OCR interval per camera (ms) while motion is present" />
+            <EditText android:id="@+id/ocrInterval" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minimum confidence (%)" />
+            <EditText android:id="@+id/minConf" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keep history for (days, 0 = forever)" />
+            <EditText android:id="@+id/retention" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <CheckBox
+                android:id="@+id/beep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/row_bg"
+                android:padding="6dp"
+                android:text="Beep when a new vehicle is logged"
+                android:textColor="@color/text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/save"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save &amp; back" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/exportCsv"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Export history (CSV)" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/clearHistory"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Clear history"
+                android:textColor="@color/error" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

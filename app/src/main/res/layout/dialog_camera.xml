@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="Camera name" />
+        <EditText android:id="@+id/name" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Gate Cam 1" android:inputType="text" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="RTSP URL" />
+        <EditText android:id="@+id/url" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="rtsp://user:pass@192.168.1.64:554/..." android:inputType="textUri" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/url_help" android:textColor="@color/text_dim" android:textSize="11sp" />
+
+        <CheckBox android:id="@+id/enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enabled" android:textColor="@color/text" />
+        <CheckBox android:id="@+id/tcp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use TCP transport (recommended)" android:textColor="@color/text" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Plate search area, % of frame (left, top, right, bottom). Narrow it to the lane to avoid reading signboards." />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <EditText android:id="@+id/roiL" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="0" android:inputType="number" />
+            <EditText android:id="@+id/roiT" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:layout_weight="1" android:hint="0" android:inputType="number" />
+            <EditText android:id="@+id/roiR" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:layout_weight="1" android:hint="100" android:inputType="number" />
+            <EditText android:id="@+id/roiB" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:layout_weight="1" android:hint="100" android:inputType="number" />
+        </LinearLayout>
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Motion trigger" />
+        <Spinner android:id="@+id/motion" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/field_bg" android:padding="8dp" />
+    </LinearLayout>
+</ScrollView>

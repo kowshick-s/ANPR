@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="URL template" />
+    <EditText android:id="@+id/template" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="rtsp://admin:pass@192.168.1.100:554/Streaming/Channels/{ch}01" android:inputType="textUri" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/nvr_help" android:textColor="@color/text_dim" android:textSize="11sp" />
+
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Channels (comma separated or range)" />
+    <EditText android:id="@+id/channels" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="1,2,3   or   1-4" android:inputType="text" />
+
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Name prefix" />
+    <EditText android:id="@+id/prefix" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Gate Cam" android:inputType="text" />
+</LinearLayout>
