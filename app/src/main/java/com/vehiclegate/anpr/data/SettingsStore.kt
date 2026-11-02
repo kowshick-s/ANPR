@@ -56,6 +56,8 @@ data class AppSettings(
     val minConfidencePct: Int = 45,
     val beepOnEntry: Boolean = true,
     val retentionDays: Int = 30,
+    /** Live video in the dashboard tiles. Off = compact status chips (detection still runs). */
+    val showLiveVideo: Boolean = false,
     val siteTitle: String = "Vehicle Entry Monitor"
 )
 
@@ -88,6 +90,7 @@ class SettingsStore(context: Context) {
             minConfidencePct = prefs.getInt("minConfidencePct", d.minConfidencePct),
             beepOnEntry = prefs.getBoolean("beepOnEntry", d.beepOnEntry),
             retentionDays = prefs.getInt("retentionDays", d.retentionDays),
+            showLiveVideo = prefs.getBoolean("showLiveVideo", d.showLiveVideo),
             siteTitle = prefs.getString("siteTitle", d.siteTitle) ?: d.siteTitle
         )
     }
@@ -101,6 +104,7 @@ class SettingsStore(context: Context) {
             .putInt("minConfidencePct", s.minConfidencePct)
             .putBoolean("beepOnEntry", s.beepOnEntry)
             .putInt("retentionDays", s.retentionDays)
+            .putBoolean("showLiveVideo", s.showLiveVideo)
             .putString("siteTitle", s.siteTitle)
             .apply()
     }

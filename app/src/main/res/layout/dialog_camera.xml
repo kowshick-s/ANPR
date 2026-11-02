@@ -16,6 +16,11 @@
         <EditText android:id="@+id/url" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="rtsp://user:pass@192.168.1.64:554/..." android:inputType="textUri" />
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/url_help" android:textColor="@color/text_dim" android:textSize="11sp" />
 
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/dlgTest" style="@style/TvButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Test connection" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/dlgPreview" style="@style/TvButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="▶ Preview" />
+        </LinearLayout>
+
         <CheckBox android:id="@+id/enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enabled" android:textColor="@color/text" />
         <CheckBox android:id="@+id/tcp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use TCP transport (recommended)" android:textColor="@color/text" />
 

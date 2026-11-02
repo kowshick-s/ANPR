@@ -69,4 +69,17 @@ class AnprCoreTest {
         eng.tick(10_000)
         assertEquals(setOf("TN22CD5678", "MH12EF9012"), out.map { it.compact }.toSet())
     }
+
+    @Test fun rtspProbeParsesUrlsAndStreamHeaders() {
+        val t = RtspProbe.parseUrl("rtsp://admin:p%40ss%2B1@10.0.0.5/cam/realmonitor?channel=1&subtype=0")
+        assertEquals("admin", t.user)
+        assertEquals("p@ss+1", t.password)
+        assertEquals(554, t.port)
+        assertEquals("/cam/realmonitor?channel=1&subtype=0", t.pathQuery)
+        assertEquals("YWRtaW46cEBzcysx", RtspProbe.base64Encode("admin:p@ss+1".toByteArray()))
+        // Real x264 SPS headers -> resolution
+        assertEquals(1920 to 1080, RtspProbe.H264Sps.parse(RtspProbe.base64Decode("Z2QAKKzZQHgCJ+XARAAAAwAEAAADAMg8YMZY")))
+        assertEquals(1280 to 720, RtspProbe.H264Sps.parse(RtspProbe.base64Decode("Z0LAH9oBQBbsBEAAAAMAQAAADIPGDKg=")))
+        assertEquals("rtsp://h/a/trackID=1", RtspProbe.resolveControl("rtsp://h/a/", "trackID=1"))
+    }
 }

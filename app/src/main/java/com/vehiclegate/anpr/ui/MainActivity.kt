@@ -47,7 +47,8 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private val handler = Handler(Looper.getMainLooper())
 
     private class Tile(val root: View, val video: TextureView, val dot: ImageView,
-                       val status: TextView, val lastRead: TextView) {
+                       val status: TextView, val lastRead: TextView,
+                       val name: TextView, val camName: String, val compact: Boolean) {
         val hideRead = Runnable { lastRead.visibility = View.GONE }
     }
     private val tiles = HashMap<String, Tile>()
@@ -122,14 +123,23 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         b.cameraStrip.removeAllViews()
         tiles.clear()
         b.cameraStrip.visibility = if (cameras.isEmpty()) View.GONE else View.VISIBLE
+        val compact = !settings.showLiveVideo
+        b.cameraStrip.layoutParams = b.cameraStrip.layoutParams.apply {
+            height = ((if (compact) 46 else 118) * resources.displayMetrics.density).toInt()
+        }
         val inflater = LayoutInflater.from(this)
         cameras.forEachIndexed { i, cam ->
             val v = inflater.inflate(R.layout.item_camera_tile, b.cameraStrip, false)
             if (i > 0) (v.layoutParams as android.widget.LinearLayout.LayoutParams).marginStart =
                 (8 * resources.displayMetrics.density).toInt()
             val tile = Tile(v, v.findViewById(R.id.video), v.findViewById(R.id.statusDot),
-                v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead))
-            v.findViewById<TextView>(R.id.name).text = cam.name
+                v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead),
+                v.findViewById(R.id.name), cam.name, compact)
+            tile.name.text = cam.name
+            if (compact) {
+                v.findViewById<View>(R.id.cover).visibility = View.VISIBLE
+                tile.status.visibility = View.GONE
+            }
             setTileStatus(tile, CameraStream.Status.CONNECTING, null)
             tiles[cam.id] = tile
             b.cameraStrip.addView(v)
@@ -144,6 +154,15 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             CameraStream.Status.STOPPED -> R.color.text_dim
         }
         t.dot.setColorFilter(ContextCompat.getColor(this, color))
+        if (t.compact) {
+            t.name.text = "${t.camName} · " + when (s) {
+                CameraStream.Status.LIVE -> "Live" + (msg?.let { " $it" } ?: "")
+                CameraStream.Status.CONNECTING -> "Connecting…"
+                CameraStream.Status.RECONNECTING -> "Offline"
+                CameraStream.Status.STOPPED -> "Stopped"
+            }
+            return
+        }
         t.status.text = when (s) {
             CameraStream.Status.LIVE -> ""
             CameraStream.Status.CONNECTING -> "Connecting…"

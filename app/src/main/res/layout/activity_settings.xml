@@ -121,6 +121,15 @@
                 android:padding="6dp"
                 android:text="Beep when a new vehicle is logged"
                 android:textColor="@color/text" />
+
+            <CheckBox
+                android:id="@+id/liveVideo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/row_bg"
+                android:padding="6dp"
+                android:text="Show live camera video on the dashboard (off = small status chips; use ▶ Preview to watch a camera)"
+                android:textColor="@color/text" />
         </LinearLayout>
 
         <LinearLayout

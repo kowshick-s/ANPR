@@ -52,6 +52,7 @@ dependencies {
     // RTSP playback (Hikvision / Dahua / CP Plus / generic ONVIF cameras)
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-exoplayer-rtsp:$media3")
+    implementation("androidx.media3:media3-ui:$media3") // AspectRatioFrameLayout for the camera preview screen
 
     // On-device OCR, bundled model -> works on TV boxes without Google Play Services
     implementation("com.google.mlkit:text-recognition:16.0.1")

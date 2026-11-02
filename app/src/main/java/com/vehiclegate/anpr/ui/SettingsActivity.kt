@@ -66,6 +66,8 @@ class SettingsActivity : AppCompatActivity() {
             val row = ItemCameraConfigBinding.inflate(LayoutInflater.from(this), b.cameraList, false)
             row.camName.text = (if (cam.enabled) "" else "[disabled] ") + cam.name
             row.camUrl.text = maskPassword(cam.url)
+            row.preview.setOnClickListener { PreviewActivity.start(this, cam) }
+            row.test.setOnClickListener { RtspTestDialog.show(this, cam.name, cam.url) }
             row.edit.setOnClickListener { editCamera(index) }
             row.delete.setOnClickListener {
                 MaterialAlertDialogBuilder(this)
@@ -78,7 +80,7 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun maskPassword(url: String) = url.replace(Regex("(rtsp://[^:/@]+:)[^@]*@"), "$1••••@")
+    private fun maskPassword(url: String) = RtspTestDialog.maskPassword(url)
 
     private fun persistCameras() {
         app.settingsStore.saveCameras(cameras)
@@ -110,28 +112,40 @@ class SettingsActivity : AppCompatActivity() {
             .create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val url = d.url.text.toString().trim()
-                if (!url.startsWith("rtsp://", ignoreCase = true) && !url.startsWith("rtsps://", ignoreCase = true)) {
-                    toast("URL must start with rtsp://"); return@setOnClickListener
-                }
-                val l = d.roiL.int(0).coerceIn(0, 95)
-                val t = d.roiT.int(0).coerceIn(0, 95)
-                val r = d.roiR.int(100).coerceIn(l + 5, 100)
-                val bt = d.roiB.int(100).coerceIn(t + 5, 100)
-                val updated = c.copy(
-                    name = d.name.text.toString().trim().ifEmpty { "Camera" },
-                    url = url,
-                    enabled = d.enabled.isChecked,
-                    useTcp = d.tcp.isChecked,
-                    roiLeft = l, roiTop = t, roiRight = r, roiBottom = bt,
-                    motionSensitivity = d.motion.selectedItemPosition
-                )
+                val updated = readCameraDialog(d, c) ?: return@setOnClickListener
                 if (index == null) cameras += updated else cameras[index] = updated
                 persistCameras()
                 dialog.dismiss()
             }
         }
+        // Test / preview what is typed in the dialog, before saving.
+        d.dlgTest.setOnClickListener {
+            readCameraDialog(d, c)?.let { RtspTestDialog.show(this, it.name, it.url) }
+        }
+        d.dlgPreview.setOnClickListener {
+            readCameraDialog(d, c)?.let { PreviewActivity.start(this, it) }
+        }
         dialog.show()
+    }
+
+    /** Builds a CameraConfig from the dialog fields, or shows a toast and returns null. */
+    private fun readCameraDialog(d: DialogCameraBinding, base: CameraConfig): CameraConfig? {
+        val url = d.url.text.toString().trim()
+        if (!url.startsWith("rtsp://", ignoreCase = true) && !url.startsWith("rtsps://", ignoreCase = true)) {
+            toast("URL must start with rtsp://"); return null
+        }
+        val l = d.roiL.int(0).coerceIn(0, 95)
+        val t = d.roiT.int(0).coerceIn(0, 95)
+        val r = d.roiR.int(100).coerceIn(l + 5, 100)
+        val bt = d.roiB.int(100).coerceIn(t + 5, 100)
+        return base.copy(
+            name = d.name.text.toString().trim().ifEmpty { "Camera" },
+            url = url,
+            enabled = d.enabled.isChecked,
+            useTcp = d.tcp.isChecked,
+            roiLeft = l, roiTop = t, roiRight = r, roiBottom = bt,
+            motionSensitivity = d.motion.selectedItemPosition
+        )
     }
 
     private fun addNvrChannels() {
@@ -184,6 +198,7 @@ class SettingsActivity : AppCompatActivity() {
         b.minConf.setText(s.minConfidencePct.toString())
         b.retention.setText(s.retentionDays.toString())
         b.beep.isChecked = s.beepOnEntry
+        b.liveVideo.isChecked = s.showLiveVideo
     }
 
     private fun save() {
@@ -196,6 +211,7 @@ class SettingsActivity : AppCompatActivity() {
                 ocrIntervalMs = b.ocrInterval.int(d.ocrIntervalMs).coerceIn(100, 5_000),
                 minConfidencePct = b.minConf.int(d.minConfidencePct).coerceIn(0, 100),
                 beepOnEntry = b.beep.isChecked,
+                showLiveVideo = b.liveVideo.isChecked,
                 retentionDays = b.retention.int(d.retentionDays).coerceIn(0, 3650),
                 siteTitle = b.siteTitle.text.toString().trim().ifEmpty { d.siteTitle }
             )

@@ -31,7 +31,23 @@
     </LinearLayout>
 
     <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/preview"
+        style="@style/TvButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="▶ Preview" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/test"
+        style="@style/TvButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="Test" />
+
+    <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/edit"
+        android:layout_marginStart="8dp"
         style="@style/TvButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
