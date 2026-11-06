@@ -98,4 +98,20 @@ class AnprCoreTest {
         assertEquals("rtsp://admin:p%40ss@10.0.0.2:554/x", RtspProbe.normalizeUrl("rtsp://admin:p%40ss@10.0.0.2:554/x"))
         assertEquals("rtsp://10.0.0.2:554/x", RtspProbe.normalizeUrl("rtsp://10.0.0.2/x"))
     }
+
+    @Test fun locatorFindsASmallTwoLinePlate() {
+        // 640×360 grey scene with a 70×46 white two-line plate (5 + 4 dark characters)
+        val w = 640; val h = 360
+        val g = IntArray(w * h) { 95 + (it * 7919 % 13) } // mild noise
+        fun fill(x0: Int, y0: Int, x1: Int, y1: Int, v: Int) {
+            for (y in y0 until y1) for (x in x0 until x1) g[y * w + x] = v
+        }
+        fill(400, 200, 470, 246, 225)
+        for (i in 0 until 5) fill(406 + i * 12, 205, 413 + i * 12, 220, 30)  // TN22D
+        for (i in 0 until 4) fill(412 + i * 12, 227, 419 + i * 12, 242, 30)  // 7458
+        val found = PlateLocator.locate(g, w, h)
+        assertTrue("no candidates", found.isNotEmpty())
+        val best = found.first()
+        assertTrue("wrong place: $best", best.left in 390..410 && best.top in 190..210 && best.right in 455..480)
+    }
 }

@@ -82,9 +82,18 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 
 History is kept in an on-device database (default 30 days, configurable). *Settings → Export history (CSV)* writes a CSV to the box's **Downloads** folder.
 
-## 5. How "best result from multiple cameras" works
+## 5. How detection works
 
-1. **Per frame** – ML Kit OCR finds text; every line, every run of words on a line, and every pair of stacked lines (two-line plates) is tested against Indian formats: `TN 09 AB 1234`, `KA 01 A 1234`, `DL 3C AB 1234`, Bharat series `22 BH 1234 AA`. The HSRP `IND` strip is ignored.
+**Plate-first reading (per frame)**
+1. Motion in the search area triggers a frame grab at full camera resolution.
+2. **Locate plates** (`PlateLocator`): bright plate-shaped regions that contain dark character blobs, plus aligned groups of characters (single- and two-line plates). The tilt of each plate is measured.
+3. **Prepare each plate**: crop with margin → straighten by the measured tilt → enlarge so the plate is ~420 px wide → high-contrast grayscale + sharpening. Tilted plates are also read un-rotated.
+4. **OCR** each prepared crop (ML Kit). Every 3rd cycle, if nothing was readable, the whole area plus 2×2 zoomed tiles are read as a fallback.
+
+**Set the search area – the most important setting.** In ▶ Preview press **✏ Set search area** and drag a box around where plates pass (TV remote: arrows move, OK switches to resize, BACK to save). It is saved to the camera and kept after closing/restarting the app until you change it. A smaller area = fewer false reads and faster processing. **⛶ Zoom to area** enlarges the picture on screen so you can check it. **🔍 Read plate now** shows the regions found (yellow), the plates read (green) and a strip with each enlarged crop the OCR saw.
+
+**Combining cameras**
+1. **Per read** – each OCR text is checked against Indian plate formats: every line, every run of words on a line, and every pair of stacked lines (two-line plates) is tested against Indian formats: `TN 09 AB 1234`, `KA 01 A 1234`, `DL 3C AB 1234`, Bharat series `22 BH 1234 AA`. The HSRP `IND` strip is ignored.
 2. **Position-aware correction** – a character is only allowed to be a letter where the format needs a letter, and a digit where it needs a digit: `O→0`, `8→B`, `B→8`, `5→S`, `Z→2`, `1→I`… State codes are checked against the real list (TN, KA, MH, …), so `7N` is fixed to `TN` and `XX…` is rejected. Each read gets a score = OCR confidence × format fit.
 3. **Tracking** – reads from *all* cameras that are within 1–2 characters of each other are grouped as the same vehicle.
 4. **Decision** – once no camera has seen the vehicle for the *decision delay* (default 2.5 s), every read from every camera votes character by character, weighted by its score. The candidate best supported by the evidence (and still a valid plate) wins. A vehicle needs ≥ 2 reads (or one very confident read) and the minimum confidence.

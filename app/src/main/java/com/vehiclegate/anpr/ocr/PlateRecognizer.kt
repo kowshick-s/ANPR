@@ -8,7 +8,9 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.vehiclegate.anpr.core.IndianPlateParser
 import com.vehiclegate.anpr.core.ParsedPlate
+import com.vehiclegate.anpr.core.PlateLocator
 import java.util.concurrent.Executors
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -37,28 +39,32 @@ class PlateRecognizer {
      * Asynchronously recognises plates in [bitmap]. [callback] is always invoked exactly once,
      * on a background thread. The caller keeps ownership of [bitmap].
      */
-    fun recognize(bitmap: Bitmap, maxUpscale: Float = 2f, callback: (List<Candidate>) -> Unit) {
+    fun recognize(bitmap: Bitmap, maxUpscale: Float = 2f, callback: (List<Candidate>) -> Unit) =
+        recognizeRaw(bitmap, maxUpscale, joinAll = false) { c, _ -> callback(c) }
+
+    /** Like [recognize] but also returns the raw OCR text (for the preview's debug strip). */
+    fun recognizeRaw(bitmap: Bitmap, maxUpscale: Float, joinAll: Boolean, callback: (List<Candidate>, String) -> Unit) {
         // ML Kit wants characters ≥ ~16 px tall; upscale small regions of interest.
         val scale = if (bitmap.width < MIN_OCR_WIDTH) min(maxUpscale, MIN_OCR_WIDTH.toFloat() / bitmap.width) else 1f
         val input = if (scale > 1.01f) {
             Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
         } else bitmap
 
-        fun done(result: List<Candidate>) {
+        fun done(result: List<Candidate>, raw: String) {
             if (input !== bitmap) input.recycle()
-            callback(result)
+            callback(result, raw)
         }
 
         try {
             recognizer.process(InputImage.fromBitmap(input, 0))
                 .addOnSuccessListener(callbackExecutor) { text ->
-                    val cands = try { extract(text, scale) } catch (e: Exception) { emptyList() }
-                    done(cands)
+                    val cands = try { extract(text, scale, joinAll) } catch (e: Exception) { emptyList() }
+                    done(cands, text.text.replace('\n', ' ').trim())
                 }
-                .addOnFailureListener(callbackExecutor) { done(emptyList()) }
-                .addOnCanceledListener(callbackExecutor) { done(emptyList()) }
+                .addOnFailureListener(callbackExecutor) { done(emptyList(), "") }
+                .addOnCanceledListener(callbackExecutor) { done(emptyList(), "") }
         } catch (e: Exception) {
-            done(emptyList())
+            done(emptyList(), "")
         }
     }
 
@@ -96,6 +102,99 @@ class PlateRecognizer {
         next(0)
     }
 
+    /** One plate region that was located, prepared and read – shown in the preview for checking. */
+    class DebugCrop(val region: Rect, val image: Bitmap, val text: String, val plate: String?)
+
+    class PlateResult(
+        val candidates: List<Candidate>,
+        /** Regions the locator found (source-bitmap coordinates). */
+        val regions: List<Rect>,
+        val debug: List<DebugCrop>,
+        val usedTiles: Boolean
+    )
+
+    /**
+     * Plate-first recognition – the main pipeline:
+     *  1. [PlateLocator] finds plate-like regions (white plate + characters, or aligned text).
+     *  2. Each region is cropped with margin, straightened by its measured tilt, enlarged so the
+     *     plate is ~420 px wide, converted to high-contrast grayscale, and read by OCR.
+     *     Tilted plates are read both straightened and as-is.
+     *  3. If nothing is read and [tilesFallback] is set, the whole image + 2×2 zoomed tiles are read.
+     * Box coordinates are in [bitmap] coordinates. Caller keeps [bitmap] until [callback].
+     * [callback] runs once on a background thread.
+     */
+    fun recognizePlates(
+        bitmap: Bitmap,
+        tilesFallback: Boolean,
+        keepDebug: Boolean = false,
+        callback: (PlateResult) -> Unit
+    ) {
+        workExecutor.execute {
+            val regions: List<Pair<Rect, Float>> = try { locate(bitmap) } catch (e: Exception) { emptyList() }
+            val jobs = ArrayList<Pair<Rect, Bitmap>>()
+            for ((r, angle) in regions) {
+                try {
+                    jobs += r to PlateImage.prepare(bitmap, r, angle)
+                    if (abs(angle) > 8f) jobs += r to PlateImage.prepare(bitmap, r, 0f)
+                } catch (_: Exception) { }
+            }
+            val found = HashMap<String, Candidate>()
+            val debug = ArrayList<DebugCrop>()
+
+            fun finish() {
+                if (found.isEmpty() && tilesFallback) {
+                    val tileRegions = listOf(Rect(0, 0, bitmap.width, bitmap.height)) +
+                        tiles(bitmap.width, bitmap.height, 2, 2)
+                    recognizeRegions(bitmap, tileRegions) { t ->
+                        callback(PlateResult(t, regions.map { it.first }, debug, usedTiles = true))
+                    }
+                } else {
+                    callback(PlateResult(found.values.sortedByDescending { it.score },
+                        regions.map { it.first }, debug, usedTiles = false))
+                }
+            }
+
+            fun next(i: Int) {
+                if (i >= jobs.size) { finish(); return }
+                val (region, img) = jobs[i]
+                recognizeRaw(img, maxUpscale = 1f, joinAll = true) { cands, raw ->
+                    val best = cands.firstOrNull()
+                    if (keepDebug) {
+                        val thumbH = 120
+                        val tw = (img.width * thumbH / img.height.coerceAtLeast(1)).coerceIn(1, 480)
+                        debug += DebugCrop(region, Bitmap.createScaledBitmap(img, tw, thumbH, true), raw, best?.plate?.formatted)
+                    }
+                    img.recycle()
+                    for (c in cands) {
+                        val placed = c.copy(box = Rect(region))
+                        val prev = found[c.plate.compact]
+                        if (prev == null || placed.score > prev.score) found[c.plate.compact] = placed
+                    }
+                    next(i + 1)
+                }
+            }
+            next(0)
+        }
+    }
+
+    /** Runs [PlateLocator] on a ≤1280-wide grayscale copy; returns regions in bitmap coordinates. */
+    private fun locate(bitmap: Bitmap): List<Pair<Rect, Float>> {
+        val scale = min(1f, 1280f / bitmap.width)
+        val w = max(1, (bitmap.width * scale).toInt())
+        val h = max(1, (bitmap.height * scale).toInt())
+        val small = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, w, h, true) else bitmap
+        val px = IntArray(w * h)
+        small.getPixels(px, 0, w, 0, 0, w, h)
+        if (small !== bitmap) small.recycle()
+        for (i in px.indices) {
+            val p = px[i]
+            px[i] = ((p shr 16 and 0xFF) * 77 + (p shr 8 and 0xFF) * 150 + (p and 0xFF) * 29) shr 8
+        }
+        return PlateLocator.locate(px, w, h, MAX_PLATE_CANDIDATES).map { c ->
+            Rect((c.left / scale).toInt(), (c.top / scale).toInt(), (c.right / scale).toInt(), (c.bottom / scale).toInt()) to c.angle
+        }
+    }
+
     /** Releases the OCR model. In-flight requests complete with an empty result. */
     fun close() {
         recognizer.close()
@@ -103,7 +202,7 @@ class PlateRecognizer {
 
     private class LineInfo(val text: String, val conf: Float, val box: Rect)
 
-    private fun extract(text: Text, scale: Float): List<Candidate> {
+    private fun extract(text: Text, scale: Float, joinAll: Boolean = false): List<Candidate> {
         val found = HashMap<String, Candidate>()
         fun offer(raw: String, conf: Float, box: Rect) {
             val parsed = IndianPlateParser.parse(raw) ?: return
@@ -157,6 +256,13 @@ class PlateRecognizer {
             offer(a.text + b.text, min(a.conf, b.conf), Rect(a.box).apply { union(b.box) })
         }
 
+        // A crop that contains only one plate: read all its lines top-to-bottom as one plate.
+        if (joinAll && lines.size in 1..4) {
+            val ordered = lines.sortedBy { it.box.top }
+            offer(ordered.joinToString("") { it.text }, ordered.minOf { it.conf },
+                Rect(ordered[0].box).apply { ordered.forEach { l -> union(l.box) } })
+        }
+
         return found.values.sortedByDescending { it.score }
     }
 
@@ -179,6 +285,10 @@ class PlateRecognizer {
             }
             return out
         }
+
+        private const val MAX_PLATE_CANDIDATES = 5
+        /** Locating + preparing crops (CPU work) off the main thread, one frame at a time per app. */
+        private val workExecutor = Executors.newSingleThreadExecutor()
 
         /** Shared and never shut down, so late ML Kit callbacks after close() are still delivered safely. */
         private val callbackExecutor = Executors.newSingleThreadExecutor()

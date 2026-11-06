@@ -54,8 +54,7 @@ class CameraStream(
     private val motion = MotionDetector()
     private val smallFrame: Bitmap = Bitmap.createBitmap(MotionDetector.W, MotionDetector.H, Bitmap.Config.ARGB_8888)
     private var lastMotionAt = 0L
-    /** Union of motion boxes since the last OCR, 0..1 of the region of interest. */
-    private var motionArea: RectF? = null
+    private var ocrCycle = 0
     private var lastOcrAt = 0L
     @Volatile private var ocrBusy = false
 
@@ -175,11 +174,7 @@ class CameraStream(
             true
         } else {
             textureView.getBitmap(smallFrame)
-            if (motion.update(smallFrame, config)) {
-                if (now - lastMotionAt >= MOTION_HOLD_MS) motionArea = null // new event
-                lastMotionAt = now
-                motion.box?.let { b -> motionArea = motionArea?.apply { union(b) } ?: RectF(b) }
-            }
+            if (motion.update(smallFrame, config)) lastMotionAt = now
             now - lastMotionAt < MOTION_HOLD_MS
         }
         if (!moving || ocrBusy || now - lastOcrAt < ocrIntervalMs) return
@@ -202,35 +197,15 @@ class CameraStream(
         if (crop !== full) full.recycle()
 
         ocrBusy = true
-        val regions = ocrRegions(crop.width, crop.height)
-        motionArea = null // next cycle starts a fresh motion area
-        recognizer.recognizeRegions(crop, regions) { candidates ->
+        // Plate-first: locate plates, straighten + enlarge each, OCR. Every 3rd cycle also fall
+        // back to zoomed tiles when no plate region was readable.
+        val useTiles = (ocrCycle++ % 3 == 0)
+        recognizer.recognizePlates(crop, tilesFallback = useTiles) { result ->
+            val candidates = result.candidates
             ocrBusy = false
             if (candidates.isEmpty()) crop.recycle()
             else listener.onPlates(config, candidates, crop, timestamp)
         }
-    }
-
-    /**
-     * Zoom-in strategy. Plates of two-wheelers are often only 60–80 px wide in a 720p/1080p
-     * frame – too small for OCR on the whole picture. So we OCR enlarged crops instead:
-     *  - the area where something moved (padded), when motion is localised, or
-     *  - the whole frame plus 2×2 overlapping tiles (each upscaled) otherwise.
-     */
-    private fun ocrRegions(w: Int, h: Int): List<Rect> {
-        val full = Rect(0, 0, w, h)
-        val m = motionArea
-        if (m != null && m.width() * m.height() < 0.5f) {
-            val padX = max(m.width() * 0.25f, 0.08f)
-            val padY = max(m.height() * 0.25f, 0.08f)
-            var l = (m.left - padX).coerceAtLeast(0f); var r = (m.right + padX).coerceAtMost(1f)
-            var t = (m.top - padY).coerceAtLeast(0f); var b = (m.bottom + padY).coerceAtMost(1f)
-            // at least 30 % of the frame so the plate is not cut off
-            if (r - l < 0.3f) { val c = (l + r) / 2; l = (c - 0.15f).coerceIn(0f, 0.7f); r = l + 0.3f }
-            if (b - t < 0.3f) { val c = (t + b) / 2; t = (c - 0.15f).coerceIn(0f, 0.7f); b = t + 0.3f }
-            return listOf(Rect((l * w).toInt(), (t * h).toInt(), (r * w).toInt(), (b * h).toInt()))
-        }
-        return listOf(full) + PlateRecognizer.tiles(w, h, 2, 2)
     }
 
     private fun roiRect(w: Int, h: Int): Rect {

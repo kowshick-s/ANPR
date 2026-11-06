@@ -24,6 +24,7 @@
 
     <!-- Stream info -->
     <LinearLayout
+        android:id="@+id/infoPanel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
@@ -63,13 +64,29 @@
         android:textColor="#FFFFFF"
         android:textSize="16sp" />
 
-    <!-- Bottom: plate results + actions -->
+    <!-- Bottom: what OCR saw, results, actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
         android:padding="12dp">
+
+        <!-- Each located plate as the OCR saw it (straightened, enlarged) + what it read -->
+        <HorizontalScrollView
+            android:id="@+id/debugScroll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/debugStrip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
         <TextView
             android:id="@+id/ocrResult"
@@ -83,7 +100,53 @@
             android:textSize="14sp"
             android:visibility="gone" />
 
+        <!-- Shown while editing the search area -->
+        <LinearLayout
+            android:id="@+id/editBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/label_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:maxWidth="380dp"
+                android:text="Drag on the video to draw the area (drag corners to resize, inside to move).\nTV remote: arrows move · OK switches to resize · BACK to save."
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnSaveArea"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✔ Save area" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFullArea"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Full frame" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnCancelArea"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Cancel" />
+        </LinearLayout>
+
         <HorizontalScrollView
+            android:id="@+id/buttonBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:scrollbars="none">
@@ -99,6 +162,22 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🔍 Read plate now" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnEditArea"
+                    style="@style/TvButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="✏ Set search area" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnZoom"
+                    style="@style/TvButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="⛶ Zoom to area" />
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnTest"

@@ -51,6 +51,8 @@ class PreviewActivity : AppCompatActivity() {
     private var lastRendered = -1
     private var fps = 0
     private var reconnects = 0
+    private var zoomed = false
+    private var roiBeforeEdit = RectF(0f, 0f, 1f, 1f)
     @Volatile private var ocrBusy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +79,15 @@ class PreviewActivity : AppCompatActivity() {
             b.btnRoi.text = if (showRoi) "Hide search area" else "Show search area"
         }
         b.btnClose.setOnClickListener { finish() }
+        b.btnEditArea.setOnClickListener { startEditArea() }
+        b.btnZoom.setOnClickListener { setZoom(!zoomed) }
+        b.btnSaveArea.setOnClickListener { saveArea() }
+        b.btnFullArea.setOnClickListener { b.overlay.setRoi(RectF(0f, 0f, 1f, 1f)) }
+        b.btnCancelArea.setOnClickListener { cancelEditArea() }
+        b.overlay.listener = object : RoiOverlayView.Listener {
+            override fun onRoiChanged(roi: RectF) { if (zoomed) applyZoom() }
+        }
+        b.aspect.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> if (zoomed) applyZoom() }
         updateTransportLabel()
         b.btnReadPlate.requestFocus()
     }
@@ -215,37 +226,175 @@ class PreviewActivity : AppCompatActivity() {
         else Bitmap.createBitmap(full, l, t, r - l, bt - t).also { full.recycle() }
 
         ocrBusy = true
-        showOcr("Reading… (whole frame + 6 zoomed tiles)", ok = true)
+        showOcr("Finding plates… then straightening + enlarging each one for OCR", ok = true)
+        clearDebug()
         val started = SystemClock.elapsedRealtime()
-        // Whole frame + 3×2 zoomed tiles, so small two-wheeler plates are readable too.
-        val regions = listOf(android.graphics.Rect(0, 0, crop.width, crop.height)) +
-            PlateRecognizer.tiles(crop.width, crop.height, 3, 2)
-        rec.recognizeRegions(crop, regions) { cands ->
+        rec.recognizePlates(crop, tilesFallback = true, keepDebug = true) { result ->
             val ms = SystemClock.elapsedRealtime() - started
             crop.recycle()
             runOnUiThread {
                 ocrBusy = false
-                if (cands.isEmpty()) {
-                    b.overlay.setBoxes(emptyList())
-                    showOcr("No number plate found in this frame ($ms ms).\n" +
-                        "Try when a vehicle is in front of the camera, or adjust the search area / zoom / focus.", ok = false)
+                fun toFrame(r: android.graphics.Rect) = RectF(
+                    (l + r.left).toFloat() / fw, (t + r.top).toFloat() / fh,
+                    (l + r.right).toFloat() / fw, (t + r.bottom).toFloat() / fh)
+                b.overlay.setRegions(result.regions.map { toFrame(it) })
+                b.overlay.setBoxes(result.candidates.take(5).map { RoiOverlayView.Box(toFrame(it.box), it.plate.formatted) })
+                showDebug(result.debug)
+                val found = "${result.regions.size} plate-like region(s) found (yellow)"
+                if (result.candidates.isEmpty()) {
+                    showOcr("No number plate read ($ms ms). $found.\n" +
+                        "Tip: ✏ Set search area tightly around the lane/plates so they are enlarged more, " +
+                        "and check the crops below – if the text in them is too blurry, the camera needs " +
+                        "higher resolution, faster shutter or less distance.", ok = false)
                 } else {
-                    b.overlay.setBoxes(cands.take(5).map {
-                        RoiOverlayView.Box(
-                            RectF((l + it.box.left).toFloat() / fw, (t + it.box.top).toFloat() / fh,
-                                (l + it.box.right).toFloat() / fw, (t + it.box.bottom).toFloat() / fh),
-                            it.plate.formatted
-                        )
-                    })
-                    showOcr(cands.take(5).joinToString("\n") {
-                        val w = it.box.width()
-                        "${it.plate.formatted.padEnd(15)} score ${(it.score * 100).toInt()}%  " +
-                            "OCR ${(it.confidence * 100).toInt()}%  plate ${w}px wide" +
-                            if (w < 130) "  ⚠ small" else ""
-                    } + "\n($ms ms)", ok = true)
+                    showOcr(result.candidates.take(5).joinToString("\n") {
+                        "${it.plate.formatted.padEnd(15)} score ${(it.score * 100).toInt()}%  OCR ${(it.confidence * 100).toInt()}%"
+                    } + "\n$found${if (result.usedTiles) ", read via zoomed tiles" else ""} · $ms ms", ok = true)
                 }
             }
         }
+    }
+
+    private fun clearDebug() {
+        b.debugStrip.removeAllViews()
+        b.debugScroll.visibility = View.GONE
+    }
+
+    /** Shows each prepared plate crop with the raw OCR text, so you can see what the reader saw. */
+    private fun showDebug(list: List<PlateRecognizer.DebugCrop>) {
+        clearDebug()
+        if (list.isEmpty()) return
+        val dp = resources.displayMetrics.density
+        for (dc in list.take(8)) {
+            val col = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setBackgroundResource(com.vehiclegate.anpr.R.drawable.label_bg)
+                setPadding((4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt(), (4 * dp).toInt())
+            }
+            col.addView(android.widget.ImageView(this).apply {
+                setImageBitmap(dc.image)
+                adjustViewBounds = true
+                maxHeight = (90 * dp).toInt()
+                maxWidth = (220 * dp).toInt()
+            })
+            col.addView(android.widget.TextView(this).apply {
+                text = (dc.plate?.let { "✔ $it" } ?: "✘ ${dc.text.ifBlank { "(no text)" }}").take(28)
+                setTextColor(if (dc.plate != null) 0xFF00E676.toInt() else 0xFFFFB300.toInt())
+                textSize = 11f
+                typeface = android.graphics.Typeface.MONOSPACE
+            })
+            val lp = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            lp.marginEnd = (6 * dp).toInt()
+            b.debugStrip.addView(col, lp)
+        }
+        b.debugScroll.visibility = View.VISIBLE
+    }
+
+    // ---------------------------------------------------------------- search area editing
+
+    private fun startEditArea() {
+        roiBeforeEdit = b.overlay.getRoi()
+        b.overlay.editing = true
+        b.overlay.resizeMode = false
+        b.overlay.setBoxes(emptyList()); b.overlay.setRegions(emptyList()); clearDebug()
+        if (zoomed) setZoom(false) // edit on the whole picture
+        b.editBar.visibility = View.VISIBLE
+        b.buttonBar.visibility = View.GONE
+        b.infoPanel.visibility = View.GONE
+        b.btnSaveArea.requestFocus()
+    }
+
+    private fun endEditArea() {
+        b.overlay.editing = false
+        b.editBar.visibility = View.GONE
+        b.buttonBar.visibility = View.VISIBLE
+        b.infoPanel.visibility = View.VISIBLE
+        b.btnEditArea.requestFocus()
+    }
+
+    private fun cancelEditArea() {
+        b.overlay.setRoi(roiBeforeEdit)
+        endEditArea()
+    }
+
+    /** Saves the area to this camera permanently (kept after closing/restarting the app). */
+    private fun saveArea() {
+        val r = b.overlay.getRoi()
+        val updated = cam.copy(
+            roiLeft = (r.left * 100).toInt().coerceIn(0, 95),
+            roiTop = (r.top * 100).toInt().coerceIn(0, 95),
+            roiRight = Math.ceil(r.right * 100.0).toInt().coerceIn(5, 100),
+            roiBottom = Math.ceil(r.bottom * 100.0).toInt().coerceIn(5, 100)
+        )
+        val store = (application as com.vehiclegate.anpr.AnprApp).settingsStore
+        val list = store.cameras().toMutableList()
+        val i = list.indexOfFirst { it.id == cam.id }
+        cam = updated
+        b.overlay.setRoi(cam.roiLeft, cam.roiTop, cam.roiRight, cam.roiBottom)
+        if (i >= 0) {
+            list[i] = updated
+            store.saveCameras(list)
+            android.widget.Toast.makeText(this,
+                "Search area saved for ${cam.name}: L${cam.roiLeft}% T${cam.roiTop}% R${cam.roiRight}% B${cam.roiBottom}%",
+                android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            android.widget.Toast.makeText(this,
+                "This camera is not saved yet – save it in Settings first. The area applies to this preview only.",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+        endEditArea()
+    }
+
+    // TV remote while editing: arrows move/resize, OK toggles, BACK asks to save.
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (b.overlay.editing && event.action == android.view.KeyEvent.ACTION_DOWN) {
+            val step = if (event.repeatCount > 3) 0.04f else 0.01f
+            when (event.keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> { b.overlay.nudge(-step, 0f); return true }
+                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> { b.overlay.nudge(step, 0f); return true }
+                android.view.KeyEvent.KEYCODE_DPAD_UP -> { b.overlay.nudge(0f, -step); return true }
+                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> { b.overlay.nudge(0f, step); return true }
+                android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER -> {
+                    b.overlay.resizeMode = !b.overlay.resizeMode; return true
+                }
+                android.view.KeyEvent.KEYCODE_BACK -> {
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("Save this search area?")
+                        .setMessage("It is kept for this camera until you change it again.")
+                        .setPositiveButton("Save") { _, _ -> saveArea() }
+                        .setNegativeButton("Discard") { _, _ -> cancelEditArea() }
+                        .setNeutralButton("Keep editing", null)
+                        .show()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    // ---------------------------------------------------------------- zoom (view only)
+
+    /** Enlarges the picture so the search area fills the screen (display only – OCR always uses full detail). */
+    private fun setZoom(on: Boolean) {
+        zoomed = on
+        b.btnZoom.text = if (on) "⛶ Full view" else "⛶ Zoom to area"
+        if (on) applyZoom() else {
+            b.aspect.scaleX = 1f; b.aspect.scaleY = 1f
+            b.aspect.translationX = 0f; b.aspect.translationY = 0f
+        }
+    }
+
+    private fun applyZoom() {
+        val v = b.aspect
+        val parent = v.parent as View
+        if (v.width == 0 || v.height == 0) return
+        val r = b.overlay.getRoi()
+        val scale = min(1f / r.width().coerceAtLeast(0.05f), 1f / r.height().coerceAtLeast(0.05f)).coerceIn(1f, 6f)
+        v.pivotX = 0f; v.pivotY = 0f
+        v.scaleX = scale; v.scaleY = scale
+        v.translationX = parent.width / 2f - v.left - r.centerX() * v.width * scale
+        v.translationY = parent.height / 2f - v.top - r.centerY() * v.height * scale
     }
 
     private fun showOcr(msg: String, ok: Boolean) {

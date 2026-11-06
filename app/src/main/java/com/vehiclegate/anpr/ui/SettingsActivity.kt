@@ -38,8 +38,6 @@ class SettingsActivity : AppCompatActivity() {
         b = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        cameras += app.settingsStore.cameras()
-        renderCameras()
         loadSettings(app.settingsStore.settings())
 
         b.addCamera.setOnClickListener { editCamera(null) }
@@ -48,6 +46,14 @@ class SettingsActivity : AppCompatActivity() {
         b.clearHistory.setOnClickListener { confirmClear() }
         b.exportCsv.setOnClickListener { exportCsv() }
         b.addCamera.requestFocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reload every time: Preview may have saved a new search area for a camera.
+        cameras.clear()
+        cameras += app.settingsStore.cameras()
+        renderCameras()
     }
 
     // ------------------------------------------------------------------ cameras
