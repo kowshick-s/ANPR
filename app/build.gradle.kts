@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.vehiclegate.anpr"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.vehiclegate.anpr"
@@ -38,7 +38,7 @@ android {
 }
 
 dependencies {
-    val media3 = "1.4.1"
+    val media3 = "1.5.1" // >= 1.5.0 fixes RTSP passwords containing '@' (androidx/media PR #1138)
     val room = "2.6.1"
 
     implementation("androidx.core:core-ktx:1.13.1")
