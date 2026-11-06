@@ -40,6 +40,12 @@ import java.util.Locale
  */
 class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
+    companion object {
+        /** Off-screen render size of each camera (what plate reading sees). */
+        private const val RENDER_W = 1920
+        private const val RENDER_H = 1080
+    }
+
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
     private lateinit var pipeline: AnprPipeline
@@ -51,12 +57,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
                        val name: TextView, val camName: String, val compact: Boolean) {
         var statusLabel = ""
         var scans = 0
+        var reads = 0
         var motion = false
         fun refreshName() {
             name.text = buildString {
                 append(camName)
                 if (statusLabel.isNotEmpty()) append(" · ").append(statusLabel)
                 if (scans > 0) append(" · ").append(if (motion) "motion" else "idle").append(" · ").append(scans).append(" scans")
+                if (scans > 0) append(" · ").append(reads).append(" reads")
             }
         }
         val hideRead = Runnable { lastRead.visibility = View.GONE }
@@ -146,6 +154,20 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
                 v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead),
                 v.findViewById(R.id.name), cam.name, compact)
             tile.refreshName()
+            // The video view renders at ITS OWN size. A small tile would mean scanning a tiny
+            // picture, so render at full HD off-screen and only scale it down for display.
+            tile.video.layoutParams = android.widget.FrameLayout.LayoutParams(RENDER_W, RENDER_H)
+            tile.video.pivotX = 0f
+            tile.video.pivotY = 0f
+            v.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                val w = (view.width - view.paddingLeft - view.paddingRight).coerceAtLeast(1)
+                val h = (view.height - view.paddingTop - view.paddingBottom).coerceAtLeast(1)
+                tile.video.scaleX = w.toFloat() / RENDER_W
+                tile.video.scaleY = h.toFloat() / RENDER_H
+            }
+            // Tap a camera to open its preview (check picture, search area, Read plate now).
+            v.isClickable = true
+            v.setOnClickListener { PreviewActivity.start(this, cam) }
             v.findViewById<RoiOverlayView>(R.id.roiOverlay).apply {
                 showLabel = false
                 setRoi(cam.roiLeft, cam.roiTop, cam.roiRight, cam.roiBottom)
@@ -197,8 +219,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         t.refreshName()
     }
 
+    override fun onSkipped(plate: String, reason: String) {
+        b.lastEvent.text = "Last skipped: $plate – $reason  (${timeFmt.format(Date())})"
+    }
+
     override fun onRawRead(cameraId: String, plate: String, scorePct: Int) {
         val t = tiles[cameraId] ?: return
+        t.reads++
+        t.refreshName()
         t.lastRead.text = "$plate  $scorePct%"
         t.lastRead.visibility = View.VISIBLE
         t.lastRead.removeCallbacks(t.hideRead)

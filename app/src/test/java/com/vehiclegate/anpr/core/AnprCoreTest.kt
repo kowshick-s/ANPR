@@ -65,7 +65,7 @@ class AnprCoreTest {
             eng.submit(PlateRead(cam, "Cam $cam", p(raw)!!, conf, t, null))
         read("1", "TN22CD5678", 0.9f, 0); read("2", "MH12EF9012", 0.9f, 100)
         read("1", "TN22CD5678", 0.9f, 200); read("2", "MH12EF9012", 0.9f, 300)
-        read("3", "TN01AA0001", 0.5f, 400) // single weak read
+        read("3", "7N01AA0O01", 0.5f, 400) // single read that needed 2 corrections -> noise
         eng.tick(10_000)
         assertEquals(setOf("TN22CD5678", "MH12EF9012"), out.map { it.compact }.toSet())
     }
@@ -113,5 +113,14 @@ class AnprCoreTest {
         assertTrue("no candidates", found.isNotEmpty())
         val best = found.first()
         assertTrue("wrong place: $best", best.left in 390..410 && best.top in 190..210 && best.right in 455..480)
+    }
+
+    @Test fun acceptsOneCleanReadOfAFastVehicle() {
+        val out = ArrayList<FusedVehicle<String>>()
+        val eng = PlateFusionEngine<String>(FusionParams(), { out += it })
+        eng.submit(PlateRead("1", "Cam 1", p("TN 73 L52E9")!!, 0.41f, 1000, null)) // 1 correction
+        eng.tick(10_000)
+        assertEquals(1, out.size)
+        assertEquals("TN73L5289", out[0].compact)
     }
 }

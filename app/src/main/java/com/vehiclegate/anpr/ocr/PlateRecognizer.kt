@@ -132,10 +132,12 @@ class PlateRecognizer {
         workExecutor.execute {
             val regions: List<Pair<Rect, Float>> = try { locate(bitmap) } catch (e: Exception) { emptyList() }
             val jobs = ArrayList<Pair<Rect, Bitmap>>()
-            for ((r, angle) in regions) {
+            for ((idx, pair) in regions.withIndex()) {
+                val (r, angle) = pair
                 try {
                     jobs += r to PlateImage.prepare(bitmap, r, angle)
-                    if (abs(angle) > 8f) jobs += r to PlateImage.prepare(bitmap, r, 0f)
+                    // second, un-rotated attempt only for the best two regions (keeps scans fast)
+                    if (abs(angle) > 8f && idx < 2) jobs += r to PlateImage.prepare(bitmap, r, 0f)
                 } catch (_: Exception) { }
             }
             val found = HashMap<String, Candidate>()
@@ -286,7 +288,7 @@ class PlateRecognizer {
             return out
         }
 
-        private const val MAX_PLATE_CANDIDATES = 5
+        private const val MAX_PLATE_CANDIDATES = 4
         /** Locating + preparing crops (CPU work) off the main thread, one frame at a time per app. */
         private val workExecutor = Executors.newSingleThreadExecutor()
 

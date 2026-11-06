@@ -50,6 +50,10 @@ class FusionParams(
     var minReads: Int = 2,
     /** …unless a single read is at least this good. */
     var singleReadMinScore: Float = 0.85f,
+    /** A single read is accepted if it fitted the plate format this well (≤1 correction)… */
+    var cleanFormatScore: Float = 0.9f,
+    /** …and its OCR score is at least this. */
+    var cleanReadMinScore: Float = 0.3f,
     /** Fused confidence below this is discarded as noise. */
     var minConfidence: Float = 0.45f,
     /** Same plate seen again within this window is treated as the same visit (not a new entry). */
@@ -186,8 +190,12 @@ class PlateFusionEngine<S>(
         val confidence = (0.5 * posAgreement + 0.5 * avgScore).toFloat().coerceIn(0f, 1f)
         val maxScore = reads.maxOf { it.score }
 
-        if (reads.size < params.minReads && maxScore < params.singleReadMinScore)
-            return Outcome.Rejected(plate.compact, "too few reads (${reads.size})")
+        // A fast vehicle may be read only once. Accept that if the read is clean: it needed at
+        // most one character correction and its score is reasonable – or it is very confident.
+        val bestRead = reads.maxByOrNull { it.score }!!
+        val cleanSingle = bestRead.plate.formatScore >= params.cleanFormatScore && bestRead.score >= params.cleanReadMinScore
+        if (reads.size < params.minReads && maxScore < params.singleReadMinScore && !cleanSingle)
+            return Outcome.Rejected(plate.compact, "only ${reads.size} unclear read(s)")
         if (confidence < params.minConfidence)
             return Outcome.Rejected(plate.compact, "low confidence ${"%.2f".format(confidence)}")
 

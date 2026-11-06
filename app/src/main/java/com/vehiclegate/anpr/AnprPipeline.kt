@@ -39,6 +39,9 @@ class AnprPipeline(
         fun onCameraStatus(cameraId: String, status: CameraStream.Status, message: String?)
         /** Latest raw read per camera, for the live tile overlay. Main thread. */
         fun onRawRead(cameraId: String, plate: String, scorePct: Int)
+        /** A plate was read but not logged (duplicate, too unclear …) – main thread. */
+        fun onSkipped(plate: String, reason: String) {}
+
         /** Plate-reading activity per camera (main thread). */
         fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {}
 
@@ -67,7 +70,8 @@ class AnprPipeline(
                 minConfidence = settings.minConfidencePct / 100f,
                 cooldownMs = settings.cooldownSec * 1000L
             ),
-            onVehicle = { v -> persist(v, settings) }
+            onVehicle = { v -> persist(v, settings) },
+            onDiscarded = { plate, reason -> main.post { events.onSkipped(plate, reason) } }
         )
 
         val listener = object : CameraStream.Listener {

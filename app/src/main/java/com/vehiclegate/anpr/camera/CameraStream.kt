@@ -206,8 +206,8 @@ class CameraStream(
         ocrBusy = true
         // Plate-first: locate plates, straighten + enlarge each, OCR. Every 3rd cycle also fall
         // back to zoomed tiles when no plate region was readable.
-        val roiArea = (config.roiRight - config.roiLeft) * (config.roiBottom - config.roiTop) / 10_000f
-        val useTiles = roiArea <= 0.35f || (ocrCycle % 2 == 0) // small area = cheap, always zoom
+        // Zoomed-tile fallback costs ~5 extra OCR passes: use it on every 2nd scan.
+        val useTiles = (ocrCycle % 2 == 0)
         ocrCycle++
         scans++
         listener.onScan(config, scans, moving)

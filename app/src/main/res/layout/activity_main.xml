@@ -201,6 +201,16 @@
                 android:maxLines="4"
                 android:textColor="@color/text_dim"
                 android:textSize="12sp" />
+
+            <!-- Diagnostics: plates read but not logged, and why -->
+            <TextView
+                android:id="@+id/lastEvent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:singleLine="true"
+                android:textColor="@color/warn"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <!-- Recent entries -->
