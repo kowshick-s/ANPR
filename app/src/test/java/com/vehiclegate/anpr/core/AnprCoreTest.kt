@@ -82,4 +82,20 @@ class AnprCoreTest {
         assertEquals(1280 to 720, RtspProbe.H264Sps.parse(RtspProbe.base64Decode("Z0LAH9oBQBbsBEAAAAMAQAAADIPGDKg=")))
         assertEquals("rtsp://h/a/trackID=1", RtspProbe.resolveControl("rtsp://h/a/", "trackID=1"))
     }
+
+    @Test fun specialCharactersInPasswordAreEncodedForThePlayer() {
+        // '#' would otherwise start a URL fragment -> Android sees host "12" (real bug, build 2)
+        val raw = "rtsp://admin:Pass#12@192.168.1.101:554/Streaming/Channels/1201"
+        val fixed = RtspProbe.normalizeUrl(raw)
+        assertEquals("rtsp://admin:Pass%2312@192.168.1.101:554/Streaming/Channels/1201", fixed)
+        val u = java.net.URI(fixed)
+        assertEquals("192.168.1.101", u.host)
+        assertEquals("admin:Pass#12", u.userInfo)
+
+        assertEquals("rtsp://admin:a%40b%2Fc%3Fd%3Ae@10.0.0.2:554/cam/realmonitor?channel=1&subtype=0",
+            RtspProbe.normalizeUrl("rtsp://admin:a@b/c?d:e@10.0.0.2/cam/realmonitor?channel=1&subtype=0"))
+        // already encoded stays the same, no credentials stays the same
+        assertEquals("rtsp://admin:p%40ss@10.0.0.2:554/x", RtspProbe.normalizeUrl("rtsp://admin:p%40ss@10.0.0.2:554/x"))
+        assertEquals("rtsp://10.0.0.2:554/x", RtspProbe.normalizeUrl("rtsp://10.0.0.2/x"))
+    }
 }

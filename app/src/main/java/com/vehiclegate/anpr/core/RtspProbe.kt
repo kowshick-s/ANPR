@@ -285,8 +285,8 @@ class RtspProbe(
             if (at >= 0) {
                 val userInfo = rest.substring(0, at)
                 rest = rest.substring(at + 1)
-                if (userInfo.contains('@')) warning = "password contains '@' – write it as %40 or the player may fail"
-                if (userInfo.contains('#')) warning = "password contains '#' – write it as %23"
+                val special = userInfo.filter { it in "@#?/[] " }.toSet()
+                if (special.isNotEmpty()) warning = "password contains ${special.joinToString(" ") { "'$it'" }} – the app encodes it automatically"
                 val colon = userInfo.indexOf(':')
                 user = percentDecode(if (colon >= 0) userInfo.substring(0, colon) else userInfo)
                 pass = if (colon >= 0) percentDecode(userInfo.substring(colon + 1)) else ""
@@ -308,6 +308,31 @@ class RtspProbe(
             }
             if (host.isBlank()) throw IllegalArgumentException("missing host/IP")
             return Target(secure, host, port, pathQuery, user, pass, warning)
+        }
+
+        /**
+         * Returns the URL with the username and password percent-encoded, exactly the way VLC
+         * would interpret it. Android's URI parser treats '#', '?', '/' and extra '@' in a raw
+         * password as URL syntax (e.g. "pass#12@192.168.1.101" becomes host "12"), so every URL
+         * is normalised before it is handed to the video player. Already-encoded URLs are unchanged.
+         */
+        fun normalizeUrl(raw: String): String {
+            val t = try { parseUrl(raw) } catch (e: Exception) { return raw.trim() }
+            val scheme = if (t.secure) "rtsps" else "rtsp"
+            val host = if (t.host.contains(':')) "[${t.host}]" else t.host
+            val auth = if (t.user != null) "${percentEncode(t.user)}:${percentEncode(t.password ?: "")}@" else ""
+            return "$scheme://$auth$host:${t.port}${t.pathQuery}"
+        }
+
+        private fun percentEncode(s: String): String {
+            val sb = StringBuilder()
+            for (byte in s.toByteArray(Charsets.UTF_8)) {
+                val c = byte.toInt() and 0xFF
+                val ch = c.toChar()
+                if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '-' || ch == '.' || ch == '_' || ch == '~') sb.append(ch)
+                else sb.append('%').append("%02X".format(c))
+            }
+            return sb.toString()
         }
 
         private fun percentDecode(s: String): String {

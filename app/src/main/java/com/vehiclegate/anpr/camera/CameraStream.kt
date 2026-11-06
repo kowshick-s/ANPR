@@ -16,6 +16,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import com.vehiclegate.anpr.core.RtspProbe
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.ocr.PlateRecognizer
 import kotlin.math.abs
@@ -124,7 +125,7 @@ class CameraStream(
         val source = RtspMediaSource.Factory()
             .setForceUseRtpTcp(config.useTcp)
             .setTimeoutMs(RTSP_TIMEOUT_MS)
-            .createMediaSource(MediaItem.fromUri(config.url.trim()))
+            .createMediaSource(MediaItem.fromUri(RtspProbe.normalizeUrl(config.url)))
         p.setMediaSource(source)
         p.playWhenReady = true
         p.prepare()

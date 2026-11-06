@@ -20,6 +20,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
+import com.vehiclegate.anpr.core.RtspProbe
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.databinding.ActivityPreviewBinding
 import com.vehiclegate.anpr.ocr.PlateRecognizer
@@ -167,7 +168,7 @@ class PreviewActivity : AppCompatActivity() {
             RtspMediaSource.Factory()
                 .setForceUseRtpTcp(useTcp)
                 .setTimeoutMs(8_000)
-                .createMediaSource(MediaItem.fromUri(cam.url.trim()))
+                .createMediaSource(MediaItem.fromUri(RtspProbe.normalizeUrl(cam.url)))
         )
         p.playWhenReady = true
         p.prepare()
@@ -191,6 +192,8 @@ class PreviewActivity : AppCompatActivity() {
             val sb = StringBuilder()
             sb.append("Status     : $state\n")
             sb.append("URL        : ${RtspTestDialog.maskPassword(cam.url)}\n")
+            if (runCatching { RtspProbe.parseUrl(cam.url).warning }.getOrNull() != null)
+                sb.append("URL fix    : special characters in user/password encoded\n")
             sb.append("Transport  : ${if (useTcp) "TCP (interleaved)" else "UDP"}\n")
             if (p != null) {
                 val f = p.videoFormat
