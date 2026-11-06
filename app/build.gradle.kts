@@ -21,13 +21,25 @@ android {
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
 
+    // Fixed release key so every build installs over the previous one (no "conflicts with
+    // existing package" error). release.jks is protected by a strong random password that is
+    // kept only in the GitHub secret ANPR_KEYSTORE_PASSWORD.
+    val keystorePassword: String? = System.getenv("ANPR_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.jks")
+            storePassword = keystorePassword
+            keyAlias = "anpr"
+            keyPassword = keystorePassword
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so a release APK can be side-loaded straight onto the TV box.
-            // Replace with your own signingConfig for production.
-            signingConfig = signingConfigs.getByName("debug")
+            // Local builds without the password fall back to the debug key.
+            signingConfig = signingConfigs.getByName(if (keystorePassword != null) "release" else "debug")
         }
     }
     compileOptions {

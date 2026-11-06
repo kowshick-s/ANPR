@@ -26,8 +26,25 @@ jobs:
           chmod +x gradlew
           ./gradlew testDebugUnitTest -PbuildNumber=${{ github.run_number }}
 
-      - name: Build release APK
+      - name: Check signing key password is configured
+        env:
+          ANPR_KEYSTORE_PASSWORD: ${{ secrets.ANPR_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANPR_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secret ANPR_KEYSTORE_PASSWORD is missing. Add it under Settings > Secrets and variables > Actions. Without it the APK would not install over the existing app."
+            exit 1
+          fi
+
+      - name: Build release APK (signed with the fixed release key)
+        env:
+          ANPR_KEYSTORE_PASSWORD: ${{ secrets.ANPR_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleRelease -PbuildNumber=${{ github.run_number }}
+
+      - name: Verify APK signature is the fixed release key
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          $APKSIGNER verify --print-certs app/build/outputs/apk/release/app-release.apk | tee certs.txt
+          grep -q "CN=Vehicle Gate ANPR" certs.txt
 
       - name: Rename APK
         run: |

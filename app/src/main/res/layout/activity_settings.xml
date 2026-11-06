@@ -132,10 +132,14 @@
                 android:textColor="@color/text" />
         </LinearLayout>
 
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:scrollbars="none">
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatButton
@@ -144,6 +148,22 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Save &amp; back" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/exportSettings"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Backup settings" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/importSettings"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Restore settings" />
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/exportCsv"
@@ -162,5 +182,6 @@
                 android:text="Clear history"
                 android:textColor="@color/error" />
         </LinearLayout>
+        </HorizontalScrollView>
     </LinearLayout>
 </ScrollView>

@@ -109,5 +109,43 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
+    /** Everything needed to restore this setup on a new install: cameras + settings. */
+    fun exportJson(): String {
+        val st = settings()
+        val cams = JSONArray().also { a -> cameras().forEach { a.put(it.toJson()) } }
+        val set = JSONObject()
+            .put("cooldownSec", st.cooldownSec).put("minReads", st.minReads)
+            .put("settleMs", st.settleMs).put("ocrIntervalMs", st.ocrIntervalMs)
+            .put("minConfidencePct", st.minConfidencePct).put("beepOnEntry", st.beepOnEntry)
+            .put("retentionDays", st.retentionDays).put("showLiveVideo", st.showLiveVideo)
+            .put("siteTitle", st.siteTitle)
+        return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
+            .put("cameras", cams).put("settings", set).toString(2)
+    }
+
+    /** Restores an [exportJson] backup. Returns the number of cameras imported. */
+    fun importJson(text: String): Int {
+        val o = JSONObject(text)
+        require(o.optString("app") == "VehicleGateANPR") { "not a Vehicle Gate ANPR settings file" }
+        val arr = o.getJSONArray("cameras")
+        val cams = (0 until arr.length()).map { CameraConfig.fromJson(arr.getJSONObject(it)) }
+        saveCameras(cams)
+        o.optJSONObject("settings")?.let { j ->
+            val d = AppSettings()
+            saveSettings(AppSettings(
+                cooldownSec = j.optInt("cooldownSec", d.cooldownSec),
+                minReads = j.optInt("minReads", d.minReads),
+                settleMs = j.optInt("settleMs", d.settleMs),
+                ocrIntervalMs = j.optInt("ocrIntervalMs", d.ocrIntervalMs),
+                minConfidencePct = j.optInt("minConfidencePct", d.minConfidencePct),
+                beepOnEntry = j.optBoolean("beepOnEntry", d.beepOnEntry),
+                retentionDays = j.optInt("retentionDays", d.retentionDays),
+                showLiveVideo = j.optBoolean("showLiveVideo", d.showLiveVideo),
+                siteTitle = j.optString("siteTitle", d.siteTitle)
+            ))
+        }
+        return cams.size
+    }
+
     companion object { private const val KEY_CAMERAS = "cameras" }
 }

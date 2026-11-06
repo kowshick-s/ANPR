@@ -45,7 +45,64 @@ class SettingsActivity : AppCompatActivity() {
         b.save.setOnClickListener { save(); finish() }
         b.clearHistory.setOnClickListener { confirmClear() }
         b.exportCsv.setOnClickListener { exportCsv() }
+        b.exportSettings.setOnClickListener { backupSettings() }
+        b.importSettings.setOnClickListener {
+            try {
+                pickBackup.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+            } catch (e: android.content.ActivityNotFoundException) {
+                toast("This device has no file picker – restore on a phone/tablet, or re-add cameras with '+ Add NVR channels'.")
+            }
+        }
         b.addCamera.requestFocus()
+    }
+
+    /** Restore: user picks the backup file (e.g. Downloads/vehicle_gate_settings.json). */
+    private val pickBackup = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val msg = withContext(Dispatchers.IO) {
+                try {
+                    val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                        ?: return@withContext "Could not read the file"
+                    val n = app.settingsStore.importJson(text)
+                    "Restored $n camera(s) and all settings"
+                } catch (e: Exception) {
+                    "Restore failed: ${e.message}"
+                }
+            }
+            cameras.clear(); cameras += app.settingsStore.cameras(); renderCameras()
+            loadSettings(app.settingsStore.settings())
+            toast(msg)
+        }
+    }
+
+    /** Backup: writes cameras (with RTSP URLs) + settings to Downloads/vehicle_gate_settings.json. */
+    private fun backupSettings() {
+        save() // include anything typed on this screen
+        lifecycleScope.launch {
+            val where = withContext(Dispatchers.IO) {
+                val json = app.settingsStore.exportJson()
+                val name = "vehicle_gate_settings.json"
+                try {
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, name)
+                            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                        }
+                        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                            ?: return@withContext "failed"
+                        contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                        "Downloads/$name"
+                    } else {
+                        val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+                        File(dir, name).apply { writeText(json) }.absolutePath
+                    }
+                } catch (e: Exception) { "failed: ${e.message}" }
+            }
+            toast("Settings backed up to $where (contains camera passwords – keep it private)")
+        }
     }
 
     /** The Add/Edit camera window currently open (to refresh its area after Preview). */
