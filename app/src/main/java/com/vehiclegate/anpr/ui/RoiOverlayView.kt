@@ -30,6 +30,9 @@ class RoiOverlayView @JvmOverloads constructor(
     interface Listener { fun onRoiChanged(roi: RectF) }
 
     var listener: Listener? = null
+    /** Draw the "Plate search area" caption (off for the small dashboard tiles). */
+    var showLabel = true
+        set(v) { field = v; invalidate() }
     private var roi = RectF(0f, 0f, 1f, 1f)
     private var showRoi = true
     private var boxes: List<Box> = emptyList()
@@ -172,7 +175,7 @@ class RoiOverlayView @JvmOverloads constructor(
                 r.left + 8 * d, max(r.top - 8 * d, 18 * d), roiText)
         } else if (showRoi && !full) {
             canvas.drawRect(r, roiPaint)
-            canvas.drawText("Plate search area", r.left + 6 * d, r.top + 17 * d, roiText)
+            if (showLabel) canvas.drawText("Plate search area", r.left + 6 * d, r.top + 17 * d, roiText)
         }
         for (g in regions) canvas.drawRect(g.left * w, g.top * h, g.right * w, g.bottom * h, regionPaint)
         for (b in boxes) {

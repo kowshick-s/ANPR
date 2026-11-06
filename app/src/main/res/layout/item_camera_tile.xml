@@ -11,6 +11,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Search area outline: only this part of the picture is scanned for plates -->
+    <com.vehiclegate.anpr.ui.RoiOverlayView
+        android:id="@+id/roiOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <!-- Covers the video in compact mode. The TextureView keeps decoding underneath,
          so plate detection continues while nothing is shown. -->
     <View

@@ -146,6 +146,11 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
                 v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead),
                 v.findViewById(R.id.name), cam.name, compact)
             tile.refreshName()
+            v.findViewById<RoiOverlayView>(R.id.roiOverlay).apply {
+                showLabel = false
+                setRoi(cam.roiLeft, cam.roiTop, cam.roiRight, cam.roiBottom)
+                visibility = if (compact) View.GONE else View.VISIBLE
+            }
             if (compact) {
                 v.findViewById<View>(R.id.cover).visibility = View.VISIBLE
                 tile.status.visibility = View.GONE
