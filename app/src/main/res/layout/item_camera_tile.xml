@@ -6,10 +6,13 @@
     android:background="@drawable/tile_bg"
     android:padding="1dp">
 
-    <TextureView
-        android:id="@+id/video"
+    <!-- Live picture (~1 per second) from the background scanner -->
+    <ImageView
+        android:id="@+id/picture"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:contentDescription="camera picture"
+        android:scaleType="fitXY" />
 
     <!-- Search area outline: only this part of the picture is scanned for plates -->
     <com.vehiclegate.anpr.ui.RoiOverlayView
@@ -17,8 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Covers the video in compact mode. The TextureView keeps decoding underneath,
-         so plate detection continues while nothing is shown. -->
+    <!-- Covers the picture in compact mode (scanning continues in the background). -->
     <View
         android:id="@+id/cover"
         android:layout_width="match_parent"

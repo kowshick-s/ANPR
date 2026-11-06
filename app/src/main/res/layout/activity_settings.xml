@@ -94,6 +94,9 @@
             <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site / gate name)" />
             <EditText android:id="@+id/siteTitle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
 
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Common state codes at this site (preferred when a state is misread; others still accepted). Telangana = TS and TG" />
+            <EditText android:id="@+id/commonStates" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapCharacters" />
+
             <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Re-entry cooldown (seconds) – same vehicle within this time is not logged again" />
             <EditText android:id="@+id/cooldown" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
 

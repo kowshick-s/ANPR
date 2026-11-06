@@ -2,6 +2,7 @@ package com.vehiclegate.anpr.camera
 
 import android.content.Context
 import android.net.Uri
+import android.view.Surface
 import android.view.TextureView
 import com.vehiclegate.anpr.core.RtspProbe
 import org.videolan.libvlc.LibVLC
@@ -18,11 +19,22 @@ import org.videolan.libvlc.interfaces.IVLCVout
  * so TextureView.getBitmap(w, h) returns full-detail frames for OCR even when the view is tiny.
  * All calls and callbacks are on the main thread.
  */
-class VlcPlayer(
+class VlcPlayer private constructor(
     context: Context,
-    private val textureView: TextureView,
+    private val textureView: TextureView?,
+    private val surface: Surface?,
+    private val surfaceW: Int,
+    private val surfaceH: Int,
     private val listener: Listener
 ) {
+    /** Play into a visible view (Preview screen). */
+    constructor(context: Context, textureView: TextureView, listener: Listener) :
+        this(context, textureView, null, 0, 0, listener)
+
+    /** Play into an off-screen surface of a fixed size (background scanning). */
+    constructor(context: Context, surface: Surface, width: Int, height: Int, listener: Listener) :
+        this(context, null, surface, width, height, listener)
+
     interface Listener {
         fun onVideoSize(width: Int, height: Int) {}
         fun onFirstFrame() {}
@@ -62,11 +74,19 @@ class VlcPlayer(
         media.release()
 
         val vout = mp.vlcVout
-        vout.setVideoView(textureView)
-        vout.attachViews(IVLCVout.OnNewVideoLayoutListener { _, width, height, _, _, _, _ ->
-            updateSize(width, height)
-        })
-        vout.setWindowSize(INITIAL_W, INITIAL_H)
+        if (textureView != null) {
+            vout.setVideoView(textureView)
+            vout.attachViews(IVLCVout.OnNewVideoLayoutListener { _, width, height, _, _, _, _ ->
+                updateSize(width, height)
+            })
+            vout.setWindowSize(INITIAL_W, INITIAL_H)
+        } else {
+            vout.setVideoSurface(surface, null)
+            vout.attachViews(IVLCVout.OnNewVideoLayoutListener { _, width, height, _, _, _, _ ->
+                updateSize(width, height)
+            })
+            vout.setWindowSize(surfaceW, surfaceH)
+        }
 
         mp.setEventListener { e ->
             // The layout callback is not always delivered for TextureView – also read the
@@ -99,7 +119,8 @@ class VlcPlayer(
         if (width <= 0 || height <= 0 || (width == videoWidth && height == videoHeight)) return
         videoWidth = width
         videoHeight = height
-        player?.vlcVout?.setWindowSize(width, height) // render at native resolution
+        // views render at native resolution; the off-screen surface keeps its fixed size
+        if (textureView != null) player?.vlcVout?.setWindowSize(width, height)
         listener.onVideoSize(width, height)
     }
 

@@ -7,7 +7,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
-import android.view.TextureView
 import com.vehiclegate.anpr.camera.CameraStream
 import com.vehiclegate.anpr.core.FusedVehicle
 import com.vehiclegate.anpr.core.FusionParams
@@ -42,6 +41,9 @@ class AnprPipeline(
         /** A plate was read but not logged (duplicate, too unclear …) – main thread. */
         fun onSkipped(plate: String, reason: String) {}
 
+        /** Small live picture of a camera, about once a second (main thread). */
+        fun onCameraPicture(cameraId: String, picture: Bitmap) {}
+
         /** Plate-reading activity per camera (main thread). */
         fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {}
 
@@ -55,9 +57,11 @@ class AnprPipeline(
     private var engine: PlateFusionEngine<Bitmap>? = null
     private var running = false
 
-    fun start(cameras: List<Pair<CameraConfig, TextureView>>, settings: AppSettings) {
+    fun start(cameras: List<CameraConfig>, settings: AppSettings) {
         stop()
         running = true
+        com.vehiclegate.anpr.core.IndianPlateParser.preferredStates =
+            com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(settings.commonStates)
         val rec = PlateRecognizer().also { recognizer = it }
 
         engine = PlateFusionEngine(
@@ -83,6 +87,10 @@ class AnprPipeline(
                 events.onCameraScan(camera.id, scans, motion)
             }
 
+            override fun onThumbnail(camera: CameraConfig, picture: Bitmap) {
+                events.onCameraPicture(camera.id, picture)
+            }
+
             override fun onPlates(
                 camera: CameraConfig,
                 candidates: List<PlateRecognizer.Candidate>,
@@ -101,8 +109,8 @@ class AnprPipeline(
             }
         }
 
-        for ((cfg, view) in cameras) {
-            val s = CameraStream(app, cfg, view, rec, settings.ocrIntervalMs.toLong(), listener)
+        for (cfg in cameras) {
+            val s = CameraStream(app, cfg, rec, settings.ocrIntervalMs.toLong(), settings.showLiveVideo, listener)
             streams += s
             s.start()
         }

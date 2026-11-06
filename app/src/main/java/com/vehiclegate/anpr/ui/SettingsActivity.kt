@@ -266,6 +266,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun loadSettings(s: AppSettings) {
         b.siteTitle.setText(s.siteTitle)
+        b.commonStates.setText(s.commonStates)
         b.cooldown.setText(s.cooldownSec.toString())
         b.minReads.setText(s.minReads.toString())
         b.settle.setText(s.settleMs.toString())
@@ -288,7 +289,9 @@ class SettingsActivity : AppCompatActivity() {
                 beepOnEntry = b.beep.isChecked,
                 showLiveVideo = b.liveVideo.isChecked,
                 retentionDays = b.retention.int(d.retentionDays).coerceIn(0, 3650),
-                siteTitle = b.siteTitle.text.toString().trim().ifEmpty { d.siteTitle }
+                siteTitle = b.siteTitle.text.toString().trim().ifEmpty { d.siteTitle },
+                commonStates = com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(b.commonStates.text.toString())
+                    .joinToString(",").ifEmpty { d.commonStates }
             )
         )
         app.settingsStore.saveCameras(cameras)

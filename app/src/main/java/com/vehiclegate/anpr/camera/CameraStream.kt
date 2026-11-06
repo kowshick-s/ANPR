@@ -7,7 +7,6 @@ import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.TextureView
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.ocr.PlateRecognizer
 import kotlin.math.abs
@@ -15,99 +14,98 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * One RTSP camera: plays the stream into a [TextureView] (which is also the live tile on the TV),
- * watches for motion inside the region of interest, and while something is moving grabs
- * full-resolution frames and sends them to the [PlateRecognizer].
- *
- * Auto-reconnects with back-off when the camera/NVR drops the stream or the stream freezes.
- * All methods must be called on the main thread.
+ * One RTSP camera, scanned in the background:
+ *  - LibVLC decodes the stream into an [OffscreenFrameSource] (no screen/View needed, so it keeps
+ *    working when the app is minimised or the screen is off),
+ *  - a frame loop on the source's own thread watches for motion in the search area and sends
+ *    full-HD crops of the search area to plate reading (fast during motion, slow when idle),
+ *  - auto-reconnects with back-off when the stream drops or freezes.
+ * [start]/[stop] must be called on the main thread.
  */
 class CameraStream(
     private val context: Context,
     val config: CameraConfig,
-    private val textureView: TextureView,
     private val recognizer: PlateRecognizer,
     private val ocrIntervalMs: Long,
+    /** Send a small picture about once a second for the dashboard tiles. */
+    private val thumbnails: Boolean,
     private val listener: Listener
 ) {
     enum class Status { CONNECTING, LIVE, RECONNECTING, STOPPED }
 
     interface Listener {
+        /** Main thread. */
         fun onStatus(camera: CameraConfig, status: Status, message: String?)
 
         /**
-         * Called on a background thread. [frame] is the ROI image the plates were found in
+         * Background thread. [frame] is the search-area image the plates were found in
          * (box coordinates refer to it); ownership passes to the listener.
          */
         fun onPlates(camera: CameraConfig, candidates: List<PlateRecognizer.Candidate>, frame: Bitmap, timestampMs: Long)
 
-        /** A frame was sent for plate reading (main thread) – for the dashboard's scan counter. */
+        /** A frame was sent for plate reading (main thread). */
         fun onScan(camera: CameraConfig, scans: Int, motion: Boolean) {}
+
+        /** Small live picture for the dashboard (main thread). */
+        fun onThumbnail(camera: CameraConfig, picture: Bitmap) {}
     }
 
-    private val handler = Handler(Looper.getMainLooper())
+    private val main = Handler(Looper.getMainLooper())
+    private var source: OffscreenFrameSource? = null
     private var player: VlcPlayer? = null
-    private var running = false
-    private var status = Status.STOPPED
+    @Volatile private var running = false
+    @Volatile private var status = Status.STOPPED
     private var retryDelayMs = INITIAL_RETRY_MS
 
-    private var videoW = 0
-    private var videoH = 0
-
-    private val motion = MotionDetector()
-    private val smallFrame: Bitmap = Bitmap.createBitmap(MotionDetector.W, MotionDetector.H, Bitmap.Config.ARGB_8888)
-    private var lastMotionAt = 0L
-    private var ocrCycle = 0
-    private var scans = 0
-    private var lastOcrAt = 0L
-    @Volatile private var ocrBusy = false
-
-    // Watchdog
+    // watchdog (main thread)
     private var connectedAt = 0L
     private var lastProgressAt = 0L
-    private var lastDisplayed = -1
+    private var lastFrames = 0L
+
+    // frame loop (source thread)
+    private val motion = MotionDetector()
+    private var smallFrame: Bitmap? = null
+    private var lastMotionAt = 0L
+    private var lastOcrAt = 0L
+    private var lastThumbAt = 0L
+    private var ocrCycle = 0
+    private var scans = 0
+    @Volatile private var ocrBusy = false
 
     fun start() {
         if (running) return
         running = true
+        val src = OffscreenFrameSource(RENDER_W, RENDER_H, config.name)
+        source = src
+        if (src.error != null) {
+            setStatus(Status.RECONNECTING, src.error)
+        }
         connect()
-        handler.postDelayed(frameLoop, FRAME_LOOP_MS)
-        handler.postDelayed(watchdog, WATCHDOG_MS)
+        main.postDelayed(watchdog, WATCHDOG_MS)
+        src.handler.postDelayed(frameLoop, FRAME_LOOP_MS)
     }
 
     fun stop() {
         running = false
-        handler.removeCallbacksAndMessages(null)
+        main.removeCallbacksAndMessages(null)
+        source?.handler?.removeCallbacksAndMessages(null)
         releasePlayer()
+        source?.release()
+        source = null
         setStatus(Status.STOPPED, null)
     }
 
-    // ---------------------------------------------------------------- playback (LibVLC)
+    // ---------------------------------------------------------------- playback (LibVLC → off-screen surface)
 
     private fun connect() {
+        val src = source ?: return
         releasePlayer()
         setStatus(if (retryDelayMs > INITIAL_RETRY_MS) Status.RECONNECTING else Status.CONNECTING, null)
         connectedAt = SystemClock.elapsedRealtime()
         lastProgressAt = connectedAt
-        lastDisplayed = -1
+        lastFrames = src.frames
 
-        val p = VlcPlayer(context, textureView, object : VlcPlayer.Listener {
-            override fun onVideoSize(width: Int, height: Int) {
-                videoW = width
-                videoH = height
-                if (status == Status.LIVE) setStatus(Status.LIVE, "${width}x$height")
-            }
-
-            override fun onFirstFrame() {
-                retryDelayMs = INITIAL_RETRY_MS
-                lastProgressAt = SystemClock.elapsedRealtime()
-                setStatus(Status.LIVE, if (videoW > 0) "${videoW}x$videoH" else null)
-            }
-
-            override fun onProgress() {
-                lastProgressAt = SystemClock.elapsedRealtime()
-            }
-
+        val p = VlcPlayer(context, src.surface, RENDER_W, RENDER_H, object : VlcPlayer.Listener {
             override fun onError(message: String) = scheduleReconnect(message)
             override fun onEnded() = scheduleReconnect("stream ended")
         })
@@ -119,8 +117,8 @@ class CameraStream(
         if (!running) return
         releasePlayer()
         setStatus(Status.RECONNECTING, "$reason – retry in ${retryDelayMs / 1000}s")
-        handler.removeCallbacks(reconnect)
-        handler.postDelayed(reconnect, retryDelayMs)
+        main.removeCallbacks(reconnect)
+        main.postDelayed(reconnect, retryDelayMs)
         retryDelayMs = min(retryDelayMs * 2, MAX_RETRY_MS)
     }
 
@@ -131,32 +129,38 @@ class CameraStream(
         player = null
     }
 
-    /** RTSP sources can silently freeze; restart if the playback clock stops advancing. */
+    /** Decoded frames arriving = alive. Marks LIVE, and reconnects on freeze / no video. */
     private val watchdog = object : Runnable {
         override fun run() {
             if (!running) return
+            val src = source
             val now = SystemClock.elapsedRealtime()
-            // Displayed-frame counter is the most reliable "alive" signal for live RTSP.
-            player?.stats()?.displayedFrames?.let { d ->
-                if (d != lastDisplayed) { lastDisplayed = d; lastProgressAt = now }
-            }
-            if (player != null) {
-                if (status == Status.LIVE && now - lastProgressAt > FREEZE_TIMEOUT_MS) {
+            if (src != null && player != null) {
+                val f = src.frames
+                if (f > lastFrames) {
+                    lastFrames = f
+                    lastProgressAt = now
+                    if (status != Status.LIVE) {
+                        retryDelayMs = INITIAL_RETRY_MS
+                        setStatus(Status.LIVE, null)
+                    }
+                } else if (status == Status.LIVE && now - lastProgressAt > FREEZE_TIMEOUT_MS) {
                     scheduleReconnect("stream frozen")
                 } else if (status != Status.LIVE && now - connectedAt > CONNECT_TIMEOUT_MS) {
-                    scheduleReconnect("no video")
+                    scheduleReconnect(src.error ?: "no video")
                 }
             }
-            handler.postDelayed(this, WATCHDOG_MS)
+            main.postDelayed(this, WATCHDOG_MS)
         }
     }
 
     private fun setStatus(s: Status, message: String?) {
         status = s
-        listener.onStatus(config, s, message)
+        if (Looper.myLooper() == Looper.getMainLooper()) listener.onStatus(config, s, message)
+        else main.post { listener.onStatus(config, s, message) }
     }
 
-    // ---------------------------------------------------------------- frame analysis
+    // ---------------------------------------------------------------- frame analysis (source thread)
 
     private val frameLoop = object : Runnable {
         override fun run() {
@@ -166,51 +170,49 @@ class CameraStream(
             } catch (_: Exception) {
                 // never let a single bad frame kill the loop
             }
-            handler.postDelayed(this, FRAME_LOOP_MS)
+            source?.handler?.postDelayed(this, FRAME_LOOP_MS)
         }
     }
 
     private fun analyseFrame() {
+        val src = source ?: return
         if (status != Status.LIVE) return
         val now = SystemClock.elapsedRealtime()
+
+        if (thumbnails && now - lastThumbAt >= THUMB_MS) {
+            lastThumbAt = now
+            src.grab(THUMB_W, THUMB_H)?.let { bmp -> main.post { listener.onThumbnail(config, bmp) } }
+        }
 
         val moving = if (config.motionSensitivity == 0) {
             true
         } else {
-            textureView.getBitmap(smallFrame)
-            if (motion.update(smallFrame, config)) lastMotionAt = now
+            val small = src.grab(MotionDetector.W, MotionDetector.H, smallFrame)
+            smallFrame = small
+            if (small != null && motion.update(small, config)) lastMotionAt = now
             now - lastMotionAt < MOTION_HOLD_MS
         }
+
         // Fast scans while something moves; slow "idle" scans otherwise, so vehicles that stop
         // at the gate (or creep in without much motion) are still read.
         val interval = if (moving) ocrIntervalMs else IDLE_SCAN_MS
         if (ocrBusy || now - lastOcrAt < interval) return
-        if (videoW <= 0) player?.refreshSize()
         lastOcrAt = now
 
-        // Grab at native resolution (capped at 1920 wide) regardless of the tile's size on screen.
-        // If the resolution is still unknown, fall back to 1920×1080.
-        val vw = if (videoW > 0) videoW else 1920
-        val vh = if (videoH > 0) videoH else 1080
-        val scale = min(1f, MAX_OCR_FRAME_WIDTH.toFloat() / vw)
-        val fw = max(2, (vw * scale).toInt())
-        val fh = max(2, (vh * scale).toInt())
         val timestamp = System.currentTimeMillis()
-        val full = textureView.getBitmap(fw, fh) ?: return
-
-        val roi = roiRect(fw, fh)
-        val crop = if (roi.width() == fw && roi.height() == fh) full
+        val full = src.grab(RENDER_W, RENDER_H) ?: return
+        val roi = roiRect(RENDER_W, RENDER_H)
+        val crop = if (roi.width() == RENDER_W && roi.height() == RENDER_H) full
         else Bitmap.createBitmap(full, roi.left, roi.top, roi.width(), roi.height())
         if (crop !== full) full.recycle()
 
         ocrBusy = true
-        // Plate-first: locate plates, straighten + enlarge each, OCR. Every 3rd cycle also fall
-        // back to zoomed tiles when no plate region was readable.
         // Zoomed-tile fallback costs ~5 extra OCR passes: use it on every 2nd scan.
         val useTiles = (ocrCycle % 2 == 0)
         ocrCycle++
         scans++
-        listener.onScan(config, scans, moving)
+        val n = scans
+        main.post { listener.onScan(config, n, moving) }
         recognizer.recognizePlates(crop, tilesFallback = useTiles) { result ->
             val candidates = result.candidates
             ocrBusy = false
@@ -290,13 +292,18 @@ class CameraStream(
     }
 
     companion object {
+        /** Off-screen decode size – what plate reading sees. */
+        const val RENDER_W = 1920
+        const val RENDER_H = 1080
+        private const val THUMB_W = 480
+        private const val THUMB_H = 270
+        private const val THUMB_MS = 1_000L
         private const val FRAME_LOOP_MS = 150L
         private const val MOTION_HOLD_MS = 2_500L
         private const val IDLE_SCAN_MS = 1_500L
-        private const val MAX_OCR_FRAME_WIDTH = 1920
         private const val INITIAL_RETRY_MS = 2_000L
         private const val MAX_RETRY_MS = 30_000L
-        private const val WATCHDOG_MS = 3_000L
+        private const val WATCHDOG_MS = 2_000L
         private const val FREEZE_TIMEOUT_MS = 10_000L
         private const val CONNECT_TIMEOUT_MS = 20_000L
     }

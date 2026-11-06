@@ -2,14 +2,11 @@ package com.vehiclegate.anpr.ui
 
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
-import android.view.TextureView
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -25,6 +22,8 @@ import com.vehiclegate.anpr.data.AppSettings
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.data.VehicleEntry
 import com.vehiclegate.anpr.databinding.ActivityMainBinding
+import com.vehiclegate.anpr.service.AnprEngine
+import com.vehiclegate.anpr.service.AnprService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -40,19 +39,12 @@ import java.util.Locale
  */
 class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
-    companion object {
-        /** Off-screen render size of each camera (what plate reading sees). */
-        private const val RENDER_W = 1920
-        private const val RENDER_H = 1080
-    }
-
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
-    private lateinit var pipeline: AnprPipeline
     private val adapter = EntryAdapter()
     private val handler = Handler(Looper.getMainLooper())
 
-    private class Tile(val root: View, val video: TextureView, val dot: ImageView,
+    private class Tile(val root: View, val picture: ImageView, val dot: ImageView,
                        val status: TextView, val lastRead: TextView,
                        val name: TextView, val camName: String, val compact: Boolean) {
         var statusLabel = ""
@@ -75,7 +67,6 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private var countJob: Job? = null
     private var countDayStart = 0L
     private var shownLatestId = -1L
-    private var tone: ToneGenerator? = null
 
     private val clockFmt = SimpleDateFormat("EEE, dd MMM yyyy  hh:mm:ss a", Locale.getDefault())
     private val dateFmt = SimpleDateFormat("dd MMM yyyy, EEEE", Locale.getDefault())
@@ -85,12 +76,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
-        pipeline = AnprPipeline(app, lifecycleScope, this)
 
         b.entries.layoutManager = LinearLayoutManager(this)
         b.entries.adapter = adapter
         b.entries.itemAnimator = null
         b.settingsButton.setOnClickListener { openSettings() }
+        b.exitButton.setOnClickListener { confirmExit() }
+        askPermissionsOnce()
 
         lifecycleScope.launch {
             app.db.entries().recent(50).collect { list ->
@@ -107,22 +99,67 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         val cameras = app.settingsStore.cameras().filter { it.enabled && it.url.isNotBlank() }
         buildTiles(cameras)
         b.emptyHint.text = if (cameras.isEmpty()) getString(R.string.no_cameras) else ""
-        if (cameras.isNotEmpty()) {
-            pipeline.start(cameras.map { it to tiles.getValue(it.id).video }, settings)
-        }
-        if (settings.beepOnEntry && tone == null) {
-            tone = try { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90) } catch (e: Exception) { null }
-        }
+        // Detection runs in the background service; (re)start it – it applies changed settings –
+        // and attach this screen to it.
+        AnprService.start(this)
+        AnprEngine.addListener(this)
+        restoreFromEngine()
         handler.post(clockTick)
         if (cameras.isEmpty()) b.settingsButton.requestFocus()
     }
 
     override fun onStop() {
+        // Only detach the screen – scanning continues in the background.
+        AnprEngine.removeListener(this)
         handler.removeCallbacks(clockTick)
-        pipeline.stop()
-        tone?.release()
-        tone = null
         super.onStop()
+    }
+
+    /** Show the state the background scanner already has (scans, reads, pictures, status). */
+    private fun restoreFromEngine() {
+        for ((id, st) in AnprEngine.camStates) {
+            val t = tiles[id] ?: continue
+            setTileStatus(t, st.status, st.message)
+            t.scans = st.scans; t.motion = st.motion; t.reads = st.reads
+            t.refreshName()
+            st.picture?.let { if (!t.compact) t.picture.setImageBitmap(it) }
+        }
+        AnprEngine.lastSkipped?.let { b.lastEvent.text = "Last skipped: $it" }
+    }
+
+    private fun confirmExit() {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Exit and stop scanning?")
+            .setMessage("Vehicle detection stops until you open the app again. " +
+                "To keep detecting in the background, just press Home instead.")
+            .setPositiveButton("Exit") { _, _ ->
+                AnprService.stop(this)
+                finishAndRemoveTask()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Notifications (Android 13+) and "don't optimise battery" so Android doesn't kill scanning. */
+    private fun askPermissionsOnce() {
+        val prefs = getSharedPreferences("ui_once", MODE_PRIVATE)
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            !prefs.getBoolean("askedNotif", false)
+        ) {
+            prefs.edit().putBoolean("askedNotif", true).apply()
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 23 && !prefs.getBoolean("askedBattery", false)) {
+            prefs.edit().putBoolean("askedBattery", true).apply()
+            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .setData(android.net.Uri.parse("package:$packageName")))
+                } catch (_: Exception) { /* not available on some TV boxes */ }
+            }
+        }
     }
 
     // TV remotes: MENU / SETTINGS key opens settings from anywhere.
@@ -150,21 +187,10 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             val v = inflater.inflate(R.layout.item_camera_tile, b.cameraStrip, false)
             if (i > 0) (v.layoutParams as android.widget.LinearLayout.LayoutParams).marginStart =
                 (8 * resources.displayMetrics.density).toInt()
-            val tile = Tile(v, v.findViewById(R.id.video), v.findViewById(R.id.statusDot),
+            val tile = Tile(v, v.findViewById(R.id.picture), v.findViewById(R.id.statusDot),
                 v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead),
                 v.findViewById(R.id.name), cam.name, compact)
             tile.refreshName()
-            // The video view renders at ITS OWN size. A small tile would mean scanning a tiny
-            // picture, so render at full HD off-screen and only scale it down for display.
-            tile.video.layoutParams = android.widget.FrameLayout.LayoutParams(RENDER_W, RENDER_H)
-            tile.video.pivotX = 0f
-            tile.video.pivotY = 0f
-            v.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-                val w = (view.width - view.paddingLeft - view.paddingRight).coerceAtLeast(1)
-                val h = (view.height - view.paddingTop - view.paddingBottom).coerceAtLeast(1)
-                tile.video.scaleX = w.toFloat() / RENDER_W
-                tile.video.scaleY = h.toFloat() / RENDER_H
-            }
             // Tap a camera to open its preview (check picture, search area, Read plate now).
             v.isClickable = true
             v.setOnClickListener { PreviewActivity.start(this, cam) }
@@ -219,13 +245,18 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         t.refreshName()
     }
 
+    override fun onCameraPicture(cameraId: String, picture: android.graphics.Bitmap) {
+        val t = tiles[cameraId] ?: return
+        if (!t.compact) t.picture.setImageBitmap(picture)
+    }
+
     override fun onSkipped(plate: String, reason: String) {
         b.lastEvent.text = "Last skipped: $plate – $reason  (${timeFmt.format(Date())})"
     }
 
     override fun onRawRead(cameraId: String, plate: String, scorePct: Int) {
         val t = tiles[cameraId] ?: return
-        t.reads++
+        t.reads = AnprEngine.camStates[cameraId]?.reads ?: (t.reads + 1)
         t.refreshName()
         t.lastRead.text = "$plate  $scorePct%"
         t.lastRead.visibility = View.VISIBLE
@@ -236,7 +267,6 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     // ------------------------------------------------------------------ latest vehicle
 
     override fun onVehicleSaved(entry: VehicleEntry) {
-        if (settings.beepOnEntry) tone?.startTone(ToneGenerator.TONE_PROP_BEEP2, 250)
         // The Room flow will refresh the list; flash the plate to draw attention.
         b.plateBox.animate().cancel()
         b.plateBox.scaleX = 1.12f; b.plateBox.scaleY = 1.12f

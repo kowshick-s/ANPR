@@ -68,7 +68,16 @@ By default the dashboard shows small status chips instead of live video (*Settin
 
 Live tiles at the bottom of the TV screen show each camera with a status dot (green live / amber connecting / red offline, auto-reconnecting) and the last raw read.
 
-## 4. What the TV shows
+## 4. Background scanning
+
+Detection runs in a background service, not in the dashboard screen. It keeps scanning when you press Home, open another app, or the screen turns off. A notification "Vehicle Gate ANPR is running – Scanning N cameras · Last: …" shows while it runs.
+
+* **Stop:** press **⏻ Exit** on the dashboard, or **Stop** in the notification.
+* Cameras are decoded off-screen at 1920×1080, so the dashboard tiles only show a picture about once a second (or a status chip).
+* On first start the app asks to show notifications and to be excluded from battery optimisation. Allow both, so Android doesn't stop scanning.
+* Entries made while the app was in the background appear on the dashboard when you open it.
+
+## 5. What the TV shows
 
 * **Latest entry** – plate rendered as a number plate, entry **date** and **time** (the moment the first camera saw the vehicle), snapshot with the plate boxed, confidence, and a per-camera comparison:
   ```
@@ -82,7 +91,7 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 
 History is kept in an on-device database (default 30 days, configurable). *Settings → Export history (CSV)* writes a CSV to the box's **Downloads** folder.
 
-## 5. How detection works
+## 6. How detection works
 
 **Plate-first reading (per frame)**
 1. Motion in the search area triggers a frame grab at full camera resolution.

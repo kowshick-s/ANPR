@@ -58,7 +58,9 @@ data class AppSettings(
     val retentionDays: Int = 30,
     /** Live video in the dashboard tiles. Off = compact status chips (detection still runs). */
     val showLiveVideo: Boolean = false,
-    val siteTitle: String = "Vehicle Entry Monitor"
+    val siteTitle: String = "Vehicle Entry Monitor",
+    /** State codes most vehicles at this site come from – preferred when correcting OCR errors. */
+    val commonStates: String = com.vehiclegate.anpr.core.IndianPlateParser.DEFAULT_PREFERRED
 )
 
 class SettingsStore(context: Context) {
@@ -91,7 +93,8 @@ class SettingsStore(context: Context) {
             beepOnEntry = prefs.getBoolean("beepOnEntry", d.beepOnEntry),
             retentionDays = prefs.getInt("retentionDays", d.retentionDays),
             showLiveVideo = prefs.getBoolean("showLiveVideo", d.showLiveVideo),
-            siteTitle = prefs.getString("siteTitle", d.siteTitle) ?: d.siteTitle
+            siteTitle = prefs.getString("siteTitle", d.siteTitle) ?: d.siteTitle,
+            commonStates = prefs.getString("commonStates", d.commonStates) ?: d.commonStates
         )
     }
 
@@ -106,6 +109,7 @@ class SettingsStore(context: Context) {
             .putInt("retentionDays", s.retentionDays)
             .putBoolean("showLiveVideo", s.showLiveVideo)
             .putString("siteTitle", s.siteTitle)
+            .putString("commonStates", s.commonStates)
             .apply()
     }
 
@@ -118,7 +122,7 @@ class SettingsStore(context: Context) {
             .put("settleMs", st.settleMs).put("ocrIntervalMs", st.ocrIntervalMs)
             .put("minConfidencePct", st.minConfidencePct).put("beepOnEntry", st.beepOnEntry)
             .put("retentionDays", st.retentionDays).put("showLiveVideo", st.showLiveVideo)
-            .put("siteTitle", st.siteTitle)
+            .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -141,7 +145,8 @@ class SettingsStore(context: Context) {
                 beepOnEntry = j.optBoolean("beepOnEntry", d.beepOnEntry),
                 retentionDays = j.optInt("retentionDays", d.retentionDays),
                 showLiveVideo = j.optBoolean("showLiveVideo", d.showLiveVideo),
-                siteTitle = j.optString("siteTitle", d.siteTitle)
+                siteTitle = j.optString("siteTitle", d.siteTitle),
+                commonStates = j.optString("commonStates", d.commonStates)
             ))
         }
         return cams.size

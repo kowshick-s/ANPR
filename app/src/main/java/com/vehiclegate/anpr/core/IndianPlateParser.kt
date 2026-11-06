@@ -57,6 +57,16 @@ object IndianPlateParser {
 
     private const val MIN_SCORE = 0.45f
 
+    /** Default states seen at the site (Telangana: TS and the newer TG). Editable in Settings. */
+    const val DEFAULT_PREFERRED = "TN,AP,TS,TG,KL,KA"
+
+    /** States most vehicles at this site come from – preferred when correcting OCR mistakes. */
+    @Volatile
+    var preferredStates: Set<String> = parseStateList(DEFAULT_PREFERRED)
+
+    fun parseStateList(text: String): Set<String> =
+        text.uppercase().split(',', ' ', ';', '/').map { it.trim() }.filter { it in STATE_CODES }.toSet()
+
     fun normalize(raw: String): String =
         raw.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
 
@@ -109,6 +119,8 @@ object IndianPlateParser {
         if (number.all { it == '0' }) return null
 
         var score = 1f - 0.1f * cost
+        // States rarely seen at this site are trusted a little less.
+        if (preferredStates.isNotEmpty() && state !in preferredStates) score -= 0.1f
         if (districtLen == 1) score -= 0.08f
         if (numberLen < 4) score -= 0.12f * (4 - numberLen)
         if (seriesLen == 0) score -= 0.05f
@@ -157,14 +169,33 @@ object IndianPlateParser {
     }
 
     /** Picks the cheapest valid state code reachable from the two OCR chars. */
+    /**
+     * Picks the state code for the two OCR chars. States in [preferredStates] (the ones actually
+     * seen at this site) win over others when they are at most one correction more expensive, and
+     * may be reached by replacing one unreadable character ("KH" → KA, "IN" → TN).
+     */
     private fun fixState(a: Char, b: Char): Pair<String, Int>? {
+        val preferred = preferredStates
         var best: Pair<String, Int>? = null
+        var bestPreferred: Pair<String, Int>? = null
         for ((x, cx) in letterOptions(a)) for ((y, cy) in letterOptions(b)) {
             val code = "$x$y"
             val cost = cx + cy
-            if (code in STATE_CODES && (best == null || cost < best.second)) best = code to cost
+            if (code !in STATE_CODES) continue
+            if (best == null || cost < best.second) best = code to cost
+            if (code in preferred && (bestPreferred == null || cost < bestPreferred.second)) bestPreferred = code to cost
         }
-        return best
+        if (bestPreferred == null) {
+            // one character matches a preferred state exactly, the other is unreadable
+            // only when exactly one preferred state fits – "KH" could be KA or KL, so no guess
+            val fits = preferred.filter { it.length == 2 && ((it[0] == a) xor (it[1] == b)) }
+            if (fits.size == 1) bestPreferred = fits[0] to 2
+        }
+        val bp = bestPreferred
+        return when {
+            bp != null && (best == null || bp.second <= best.second + 1) -> bp
+            else -> best
+        }
     }
 }
 

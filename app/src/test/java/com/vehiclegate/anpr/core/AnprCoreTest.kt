@@ -123,4 +123,14 @@ class AnprCoreTest {
         assertEquals(1, out.size)
         assertEquals("TN73L5289", out[0].compact)
     }
+
+    @Test fun prefersTheStatesSeenAtTheSite() {
+        assertEquals("TN09AB1234", p("IN09AB1234")?.compact)   // I->T
+        assertEquals("KA01AB1234", p("K401AB1234")?.compact)   // 4->A
+        assertEquals("TN01AB1234", p("XN01AB1234")?.compact)   // unreadable 1st char, only TN ends in N
+        assertNull(p("KH01AB1234"))                            // KA or KL? ambiguous -> no guess
+        assertEquals("TS09AB1234", p("T509AB1234")?.compact)   // 5->S, Telangana
+        assertEquals("KL07AB1234", p("KL07AB1234")?.compact)
+        assertTrue(p("MH12AB1234")!!.formatScore < p("TN12AB1234")!!.formatScore) // other states still valid, lower trust
+    }
 }
