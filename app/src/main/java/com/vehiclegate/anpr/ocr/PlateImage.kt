@@ -77,7 +77,7 @@ object PlateImage {
             var sum = 0; var n = 0
             for (dy in -1..1) { val yy = y + dy; if (yy < 0 || yy >= h) continue
                 for (dx in -1..1) { val xx = x + dx; if (xx < 0 || xx >= w) continue; sum += g[yy * w + xx]; n++ } }
-            val sharp = g[i] + (g[i] - sum / n) * 3 / 4
+            val sharp = g[i] + (g[i] - sum / n) * 2 / 5 // mild – strong sharpening turned 8 into E
             val v = ((sharp - lo) * 255 / range).coerceIn(0, 255)
             px[i] = Color.rgb(v, v, v)
         }

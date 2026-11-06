@@ -49,6 +49,16 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private class Tile(val root: View, val video: TextureView, val dot: ImageView,
                        val status: TextView, val lastRead: TextView,
                        val name: TextView, val camName: String, val compact: Boolean) {
+        var statusLabel = ""
+        var scans = 0
+        var motion = false
+        fun refreshName() {
+            name.text = buildString {
+                append(camName)
+                if (statusLabel.isNotEmpty()) append(" · ").append(statusLabel)
+                if (scans > 0) append(" · ").append(if (motion) "motion" else "idle").append(" · ").append(scans).append(" scans")
+            }
+        }
         val hideRead = Runnable { lastRead.visibility = View.GONE }
     }
     private val tiles = HashMap<String, Tile>()
@@ -135,7 +145,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             val tile = Tile(v, v.findViewById(R.id.video), v.findViewById(R.id.statusDot),
                 v.findViewById(R.id.statusText), v.findViewById(R.id.lastRead),
                 v.findViewById(R.id.name), cam.name, compact)
-            tile.name.text = cam.name
+            tile.refreshName()
             if (compact) {
                 v.findViewById<View>(R.id.cover).visibility = View.VISIBLE
                 tile.status.visibility = View.GONE
@@ -154,15 +164,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             CameraStream.Status.STOPPED -> R.color.text_dim
         }
         t.dot.setColorFilter(ContextCompat.getColor(this, color))
-        if (t.compact) {
-            t.name.text = "${t.camName} · " + when (s) {
-                CameraStream.Status.LIVE -> "Live" + (msg?.let { " $it" } ?: "")
-                CameraStream.Status.CONNECTING -> "Connecting…"
-                CameraStream.Status.RECONNECTING -> "Offline"
-                CameraStream.Status.STOPPED -> "Stopped"
-            }
-            return
+        t.statusLabel = when (s) {
+            CameraStream.Status.LIVE -> "Live"
+            CameraStream.Status.CONNECTING -> "Connecting…"
+            CameraStream.Status.RECONNECTING -> "Offline"
+            CameraStream.Status.STOPPED -> "Stopped"
         }
+        t.refreshName()
+        if (t.compact) return
         t.status.text = when (s) {
             CameraStream.Status.LIVE -> ""
             CameraStream.Status.CONNECTING -> "Connecting…"
@@ -174,6 +183,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     override fun onCameraStatus(cameraId: String, status: CameraStream.Status, message: String?) {
         val run = Runnable { tiles[cameraId]?.let { setTileStatus(it, status, message) } }
         if (Looper.myLooper() == Looper.getMainLooper()) run.run() else handler.post(run)
+    }
+
+    override fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {
+        val t = tiles[cameraId] ?: return
+        t.scans = scans
+        t.motion = motion
+        t.refreshName()
     }
 
     override fun onRawRead(cameraId: String, plate: String, scorePct: Int) {

@@ -40,6 +40,9 @@ class CameraStream(
          * (box coordinates refer to it); ownership passes to the listener.
          */
         fun onPlates(camera: CameraConfig, candidates: List<PlateRecognizer.Candidate>, frame: Bitmap, timestampMs: Long)
+
+        /** A frame was sent for plate reading (main thread) – for the dashboard's scan counter. */
+        fun onScan(camera: CameraConfig, scans: Int, motion: Boolean) {}
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -55,6 +58,7 @@ class CameraStream(
     private val smallFrame: Bitmap = Bitmap.createBitmap(MotionDetector.W, MotionDetector.H, Bitmap.Config.ARGB_8888)
     private var lastMotionAt = 0L
     private var ocrCycle = 0
+    private var scans = 0
     private var lastOcrAt = 0L
     @Volatile private var ocrBusy = false
 
@@ -177,7 +181,10 @@ class CameraStream(
             if (motion.update(smallFrame, config)) lastMotionAt = now
             now - lastMotionAt < MOTION_HOLD_MS
         }
-        if (!moving || ocrBusy || now - lastOcrAt < ocrIntervalMs) return
+        // Fast scans while something moves; slow "idle" scans otherwise, so vehicles that stop
+        // at the gate (or creep in without much motion) are still read.
+        val interval = if (moving) ocrIntervalMs else IDLE_SCAN_MS
+        if (ocrBusy || now - lastOcrAt < interval) return
         if (videoW <= 0) player?.refreshSize()
         lastOcrAt = now
 
@@ -199,7 +206,11 @@ class CameraStream(
         ocrBusy = true
         // Plate-first: locate plates, straighten + enlarge each, OCR. Every 3rd cycle also fall
         // back to zoomed tiles when no plate region was readable.
-        val useTiles = (ocrCycle++ % 3 == 0)
+        val roiArea = (config.roiRight - config.roiLeft) * (config.roiBottom - config.roiTop) / 10_000f
+        val useTiles = roiArea <= 0.35f || (ocrCycle % 2 == 0) // small area = cheap, always zoom
+        ocrCycle++
+        scans++
+        listener.onScan(config, scans, moving)
         recognizer.recognizePlates(crop, tilesFallback = useTiles) { result ->
             val candidates = result.candidates
             ocrBusy = false
@@ -281,6 +292,7 @@ class CameraStream(
     companion object {
         private const val FRAME_LOOP_MS = 150L
         private const val MOTION_HOLD_MS = 2_500L
+        private const val IDLE_SCAN_MS = 1_500L
         private const val MAX_OCR_FRAME_WIDTH = 1920
         private const val INITIAL_RETRY_MS = 2_000L
         private const val MAX_RETRY_MS = 30_000L

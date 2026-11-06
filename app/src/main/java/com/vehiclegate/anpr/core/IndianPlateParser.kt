@@ -46,7 +46,7 @@ object IndianPlateParser {
     private val LETTER_TO_DIGIT: Map<Char, Char> = mapOf(
         'O' to '0', 'D' to '0', 'Q' to '0', 'U' to '0', 'C' to '0',
         'I' to '1', 'L' to '1', 'J' to '1',
-        'Z' to '2', 'A' to '4', 'S' to '5', 'G' to '6', 'T' to '7', 'B' to '8'
+        'Z' to '2', 'A' to '4', 'S' to '5', 'G' to '6', 'T' to '7', 'B' to '8', 'E' to '8'
     )
 
     /** Letter↔letter confusions, only used to rescue an invalid state code (TM → TN). */

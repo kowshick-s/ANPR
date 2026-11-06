@@ -39,6 +39,9 @@ class AnprPipeline(
         fun onCameraStatus(cameraId: String, status: CameraStream.Status, message: String?)
         /** Latest raw read per camera, for the live tile overlay. Main thread. */
         fun onRawRead(cameraId: String, plate: String, scorePct: Int)
+        /** Plate-reading activity per camera (main thread). */
+        fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {}
+
         /** A new vehicle entry was stored. Main thread. */
         fun onVehicleSaved(entry: VehicleEntry)
     }
@@ -56,7 +59,8 @@ class AnprPipeline(
 
         engine = PlateFusionEngine(
             FusionParams(
-                settleMs = settings.settleMs.toLong(),
+                // ≥ 4 s so two idle scans (every ~1.5–2 s) of a slow/stopped vehicle land in one track
+                settleMs = maxOf(4_000L, settings.settleMs.toLong()),
                 maxTrackMs = maxOf(15_000L, settings.settleMs * 4L),
                 minReads = settings.minReads.coerceAtLeast(1),
                 singleReadMinScore = 0.85f,
@@ -69,6 +73,10 @@ class AnprPipeline(
         val listener = object : CameraStream.Listener {
             override fun onStatus(camera: CameraConfig, status: CameraStream.Status, message: String?) {
                 events.onCameraStatus(camera.id, status, message)
+            }
+
+            override fun onScan(camera: CameraConfig, scans: Int, motion: Boolean) {
+                events.onCameraScan(camera.id, scans, motion)
             }
 
             override fun onPlates(
