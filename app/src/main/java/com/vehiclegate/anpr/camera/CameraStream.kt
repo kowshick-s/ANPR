@@ -7,16 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.TextureView
-import androidx.annotation.OptIn
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.rtsp.RtspMediaSource
-import com.vehiclegate.anpr.core.RtspProbe
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.ocr.PlateRecognizer
 import kotlin.math.abs
@@ -31,7 +21,6 @@ import kotlin.math.min
  * Auto-reconnects with back-off when the camera/NVR drops the stream or the stream freezes.
  * All methods must be called on the main thread.
  */
-@OptIn(UnstableApi::class)
 class CameraStream(
     private val context: Context,
     val config: CameraConfig,
@@ -53,7 +42,7 @@ class CameraStream(
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private var player: ExoPlayer? = null
+    private var player: VlcPlayer? = null
     private var running = false
     private var status = Status.STOPPED
     private var retryDelayMs = INITIAL_RETRY_MS
@@ -67,9 +56,10 @@ class CameraStream(
     private var lastOcrAt = 0L
     @Volatile private var ocrBusy = false
 
-    // Freeze watchdog
-    private var lastPosition = -1L
+    // Watchdog
+    private var connectedAt = 0L
     private var lastProgressAt = 0L
+    private var lastDisplayed = -1
 
     fun start() {
         if (running) return
@@ -86,52 +76,37 @@ class CameraStream(
         setStatus(Status.STOPPED, null)
     }
 
-    // ---------------------------------------------------------------- playback
+    // ---------------------------------------------------------------- playback (LibVLC)
 
     private fun connect() {
         releasePlayer()
         setStatus(if (retryDelayMs > INITIAL_RETRY_MS) Status.RECONNECTING else Status.CONNECTING, null)
+        connectedAt = SystemClock.elapsedRealtime()
+        lastProgressAt = connectedAt
+        lastDisplayed = -1
 
-        // Tiny buffers = low latency; we want "now", not smooth playback.
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(500, 2_000, 250, 250)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
-
-        val p = ExoPlayer.Builder(context).setLoadControl(loadControl).build()
-        p.volume = 0f
-        p.setVideoTextureView(textureView)
-        p.addListener(object : Player.Listener {
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                videoW = videoSize.width
-                videoH = videoSize.height
+        val p = VlcPlayer(context, textureView, object : VlcPlayer.Listener {
+            override fun onVideoSize(width: Int, height: Int) {
+                videoW = width
+                videoH = height
+                if (status == Status.LIVE) setStatus(Status.LIVE, "${width}x$height")
             }
 
-            override fun onRenderedFirstFrame() {
+            override fun onFirstFrame() {
                 retryDelayMs = INITIAL_RETRY_MS
                 lastProgressAt = SystemClock.elapsedRealtime()
                 setStatus(Status.LIVE, if (videoW > 0) "${videoW}x$videoH" else null)
             }
 
-            override fun onPlayerError(error: PlaybackException) {
-                scheduleReconnect(describe(error))
+            override fun onProgress() {
+                lastProgressAt = SystemClock.elapsedRealtime()
             }
 
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) scheduleReconnect("stream ended")
-            }
+            override fun onError(message: String) = scheduleReconnect(message)
+            override fun onEnded() = scheduleReconnect("stream ended")
         })
-
-        val source = RtspMediaSource.Factory()
-            .setForceUseRtpTcp(config.useTcp)
-            .setTimeoutMs(RTSP_TIMEOUT_MS)
-            .createMediaSource(MediaItem.fromUri(RtspProbe.normalizeUrl(config.url)))
-        p.setMediaSource(source)
-        p.playWhenReady = true
-        p.prepare()
         player = p
-        lastPosition = -1
-        lastProgressAt = SystemClock.elapsedRealtime()
+        p.play(config.url, config.useTcp)
     }
 
     private fun scheduleReconnect(reason: String) {
@@ -146,29 +121,25 @@ class CameraStream(
     private val reconnect = Runnable { if (running) connect() }
 
     private fun releasePlayer() {
-        player?.let {
-            it.clearVideoTextureView(textureView)
-            it.release()
-        }
+        player?.release()
         player = null
     }
 
-    /** RTSP sources can silently freeze; restart if playback position stops moving. */
+    /** RTSP sources can silently freeze; restart if the playback clock stops advancing. */
     private val watchdog = object : Runnable {
         override fun run() {
             if (!running) return
-            val p = player
             val now = SystemClock.elapsedRealtime()
-            if (p != null && status == Status.LIVE) {
-                val pos = p.currentPosition
-                if (pos != lastPosition) {
-                    lastPosition = pos
-                    lastProgressAt = now
-                } else if (now - lastProgressAt > FREEZE_TIMEOUT_MS) {
+            // Displayed-frame counter is the most reliable "alive" signal for live RTSP.
+            player?.stats()?.displayedFrames?.let { d ->
+                if (d != lastDisplayed) { lastDisplayed = d; lastProgressAt = now }
+            }
+            if (player != null) {
+                if (status == Status.LIVE && now - lastProgressAt > FREEZE_TIMEOUT_MS) {
                     scheduleReconnect("stream frozen")
+                } else if (status != Status.LIVE && now - connectedAt > CONNECT_TIMEOUT_MS) {
+                    scheduleReconnect("no video")
                 }
-            } else if (p != null && status != Status.LIVE && now - lastProgressAt > CONNECT_TIMEOUT_MS) {
-                scheduleReconnect("no video")
             }
             handler.postDelayed(this, WATCHDOG_MS)
         }
@@ -177,15 +148,6 @@ class CameraStream(
     private fun setStatus(s: Status, message: String?) {
         status = s
         listener.onStatus(config, s, message)
-    }
-
-    private fun describe(e: PlaybackException): String {
-        val cause = e.cause?.message ?: e.message ?: ""
-        return when {
-            cause.contains("401") || cause.contains("Unauthorized", true) -> "authentication failed"
-            cause.contains("404") -> "stream path not found"
-            else -> e.errorCodeName.removePrefix("ERROR_CODE_").lowercase().replace('_', ' ')
-        }
     }
 
     // ---------------------------------------------------------------- frame analysis
@@ -289,7 +251,6 @@ class CameraStream(
         private const val FRAME_LOOP_MS = 150L
         private const val MOTION_HOLD_MS = 2_500L
         private const val MAX_OCR_FRAME_WIDTH = 1920
-        private const val RTSP_TIMEOUT_MS = 8_000L
         private const val INITIAL_RETRY_MS = 2_000L
         private const val MAX_RETRY_MS = 30_000L
         private const val WATCHDOG_MS = 3_000L

@@ -17,6 +17,8 @@ android {
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // TV boxes / phones are ARM. Keeping only ARM keeps the APK small (LibVLC is native code).
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
 
     buildTypes {
@@ -38,7 +40,6 @@ android {
 }
 
 dependencies {
-    val media3 = "1.5.1" // >= 1.5.0 fixes RTSP passwords containing '@' (androidx/media PR #1138)
     val room = "2.6.1"
 
     implementation("androidx.core:core-ktx:1.13.1")
@@ -49,10 +50,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // RTSP playback (Hikvision / Dahua / CP Plus / generic ONVIF cameras)
-    implementation("androidx.media3:media3-exoplayer:$media3")
-    implementation("androidx.media3:media3-exoplayer-rtsp:$media3")
-    implementation("androidx.media3:media3-ui:$media3") // AspectRatioFrameLayout for the camera preview screen
+    // RTSP playback: LibVLC, the engine inside the VLC app (handles NVRs that omit "fmtp" in SDP,
+    // passwords with special characters, H.265, large 4K/5MP frames …)
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 
     // On-device OCR, bundled model -> works on TV boxes without Google Play Services
     implementation("com.google.mlkit:text-recognition:16.0.1")

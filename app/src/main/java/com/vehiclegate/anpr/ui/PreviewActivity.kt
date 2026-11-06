@@ -9,18 +9,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.View
-import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.rtsp.RtspMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
-import com.vehiclegate.anpr.core.RtspProbe
+import com.vehiclegate.anpr.camera.VlcPlayer
 import com.vehiclegate.anpr.data.CameraConfig
 import com.vehiclegate.anpr.databinding.ActivityPreviewBinding
 import com.vehiclegate.anpr.ocr.PlateRecognizer
@@ -34,7 +24,6 @@ import kotlin.math.min
  * search area, and lets you run OCR on the current frame to check the camera is positioned well.
  * Nothing runs in the background – the stream is closed when you leave this screen.
  */
-@OptIn(UnstableApi::class)
 class PreviewActivity : AppCompatActivity() {
 
     companion object {
@@ -48,7 +37,7 @@ class PreviewActivity : AppCompatActivity() {
     private lateinit var b: ActivityPreviewBinding
     private lateinit var cam: CameraConfig
     private val handler = Handler(Looper.getMainLooper())
-    private var player: ExoPlayer? = null
+    private var player: VlcPlayer? = null
     private var recognizer: PlateRecognizer? = null
 
     private var useTcp = true
@@ -72,7 +61,6 @@ class PreviewActivity : AppCompatActivity() {
         cam = CameraConfig.fromJson(JSONObject(intent.getStringExtra(EXTRA_CAMERA) ?: "{}"))
         useTcp = cam.useTcp
         b.camTitle.text = cam.name
-        b.aspect.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT)
         b.overlay.setRoi(cam.roiLeft, cam.roiTop, cam.roiRight, cam.roiBottom)
 
         b.btnReadPlate.setOnClickListener { readPlateNow() }
@@ -126,57 +114,41 @@ class PreviewActivity : AppCompatActivity() {
         b.overlay.setBoxes(emptyList())
         showCenter("Connecting to ${cam.name}…\n${RtspTestDialog.maskPassword(cam.url)}")
 
-        val p = ExoPlayer.Builder(this)
-            .setLoadControl(
-                DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(500, 2_000, 250, 250)
-                    .setPrioritizeTimeOverSizeThresholds(true)
-                    .build()
-            ).build()
-        p.volume = 0f
-        p.setVideoTextureView(b.video)
-        p.addListener(object : Player.Listener {
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                if (videoSize.width > 0 && videoSize.height > 0) {
-                    videoW = videoSize.width
-                    videoH = videoSize.height
-                    b.aspect.setAspectRatio(videoW * videoSize.pixelWidthHeightRatio / videoH)
-                }
+        val p = VlcPlayer(this, b.video, object : VlcPlayer.Listener {
+            override fun onVideoSize(width: Int, height: Int) {
+                videoW = width
+                videoH = height
+                b.aspect.setAspectRatio(width.toFloat() / height)
             }
 
-            override fun onRenderedFirstFrame() {
+            override fun onFirstFrame() {
                 firstFrameMs = SystemClock.elapsedRealtime() - connectStartedAt
                 state = "LIVE"
                 showCenter(null)
             }
 
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> if (firstFrameMs < 0) state = "Buffering…"
-                    Player.STATE_ENDED -> { state = "Stream ended"; showCenter("Stream ended.\nPress Reconnect.") }
-                }
+            override fun onBuffering(percent: Float) {
+                if (firstFrameMs < 0) state = "Buffering… ${percent.toInt()}%"
             }
 
-            override fun onPlayerError(error: PlaybackException) {
+            override fun onEnded() {
+                state = "Stream ended"
+                showCenter("Stream ended / connection lost.\nPress Reconnect.")
+            }
+
+            override fun onError(message: String) {
                 state = "ERROR"
-                lastError = "${error.errorCodeName.removePrefix("ERROR_CODE_")}: ${error.cause?.message ?: error.message}"
-                showCenter("Cannot play this stream.\n$lastError\n\nPress \"Connection test\" to see which step fails.")
+                lastError = message
+                showCenter("Cannot play this stream.\n$message\n\nPress \"Connection test\" to see which step fails.")
                 b.btnTest.requestFocus()
             }
         })
-        p.setMediaSource(
-            RtspMediaSource.Factory()
-                .setForceUseRtpTcp(useTcp)
-                .setTimeoutMs(8_000)
-                .createMediaSource(MediaItem.fromUri(RtspProbe.normalizeUrl(cam.url)))
-        )
-        p.playWhenReady = true
-        p.prepare()
         player = p
+        p.play(cam.url, useTcp)
     }
 
     private fun releasePlayer() {
-        player?.let { it.clearVideoTextureView(b.video); it.release() }
+        player?.release()
         player = null
     }
 
@@ -192,22 +164,16 @@ class PreviewActivity : AppCompatActivity() {
             val sb = StringBuilder()
             sb.append("Status     : $state\n")
             sb.append("URL        : ${RtspTestDialog.maskPassword(cam.url)}\n")
-            if (runCatching { RtspProbe.parseUrl(cam.url).warning }.getOrNull() != null)
-                sb.append("URL fix    : special characters in user/password encoded\n")
+            sb.append("Player     : VLC engine (LibVLC)\n")
             sb.append("Transport  : ${if (useTcp) "TCP (interleaved)" else "UDP"}\n")
             if (p != null) {
-                val f = p.videoFormat
-                if (f != null) {
-                    val mime = (f.sampleMimeType ?: "?").removePrefix("video/").uppercase()
-                    sb.append("Codec      : $mime ${f.codecs ?: ""}\n")
-                }
-                if (videoW > 0) sb.append("Resolution : ${videoW}x$videoH" +
+                p.trackInfo()?.let { sb.append("Video      : $it\n") }
+                if (videoW > 0) sb.append("Rendering  : ${videoW}x$videoH" +
                     (if (videoW < 1280) "  ⚠ low for plates – use main stream" else "") + "\n")
-                p.videoDecoderCounters?.let { c ->
-                    c.ensureUpdated()
-                    if (lastRendered >= 0) fps = c.renderedOutputBufferCount - lastRendered
-                    lastRendered = c.renderedOutputBufferCount
-                    sb.append("Frame rate : $fps fps   dropped: ${c.droppedBufferCount}\n")
+                p.stats()?.let { st ->
+                    if (lastRendered >= 0) fps = st.displayedFrames - lastRendered
+                    lastRendered = st.displayedFrames
+                    sb.append("Frame rate : $fps fps   lost: ${st.lostFrames}   input: ${st.inputKbps} kbit/s\n")
                 }
             }
             if (firstFrameMs >= 0) sb.append("First frame: ${firstFrameMs} ms after connect\n")

@@ -5,7 +5,7 @@
     android:background="#000000"
     android:keepScreenOn="true">
 
-    <androidx.media3.ui.AspectRatioFrameLayout
+    <com.vehiclegate.anpr.ui.AspectFrameLayout
         android:id="@+id/aspect"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -20,7 +20,7 @@
             android:id="@+id/overlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-    </androidx.media3.ui.AspectRatioFrameLayout>
+    </com.vehiclegate.anpr.ui.AspectFrameLayout>
 
     <!-- Stream info -->
     <LinearLayout
