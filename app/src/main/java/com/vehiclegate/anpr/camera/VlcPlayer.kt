@@ -63,17 +63,15 @@ class VlcPlayer(
 
         val vout = mp.vlcVout
         vout.setVideoView(textureView)
-        vout.attachViews(IVLCVout.OnNewVideoLayoutListener { v, width, height, _, _, _, _ ->
-            if (width > 0 && height > 0 && (width != videoWidth || height != videoHeight)) {
-                videoWidth = width
-                videoHeight = height
-                v.setWindowSize(width, height) // render at native resolution
-                listener.onVideoSize(width, height)
-            }
+        vout.attachViews(IVLCVout.OnNewVideoLayoutListener { _, width, height, _, _, _, _ ->
+            updateSize(width, height)
         })
         vout.setWindowSize(INITIAL_W, INITIAL_H)
 
         mp.setEventListener { e ->
+            // The layout callback is not always delivered for TextureView – also read the
+            // size from the decoded track so frame grabbing always knows the real resolution.
+            if (videoWidth == 0) mp.currentVideoTrack?.let { t -> updateSize(t.width, t.height) }
             when (e.type) {
                 MediaPlayer.Event.Vout -> if (e.voutCount > 0 && !gotFirstFrame) {
                     gotFirstFrame = true
@@ -95,6 +93,14 @@ class VlcPlayer(
         }
         player = mp
         mp.play()
+    }
+
+    private fun updateSize(width: Int, height: Int) {
+        if (width <= 0 || height <= 0 || (width == videoWidth && height == videoHeight)) return
+        videoWidth = width
+        videoHeight = height
+        player?.vlcVout?.setWindowSize(width, height) // render at native resolution
+        listener.onVideoSize(width, height)
     }
 
     /** Codec FourCC (h264 / hevc …), resolution and frame rate of the playing track. */

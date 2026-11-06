@@ -3,6 +3,7 @@ package com.vehiclegate.anpr.camera
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -53,6 +54,8 @@ class CameraStream(
     private val motion = MotionDetector()
     private val smallFrame: Bitmap = Bitmap.createBitmap(MotionDetector.W, MotionDetector.H, Bitmap.Config.ARGB_8888)
     private var lastMotionAt = 0L
+    /** Union of motion boxes since the last OCR, 0..1 of the region of interest. */
+    private var motionArea: RectF? = null
     private var lastOcrAt = 0L
     @Volatile private var ocrBusy = false
 
@@ -172,7 +175,11 @@ class CameraStream(
             true
         } else {
             textureView.getBitmap(smallFrame)
-            if (motion.update(smallFrame, config)) lastMotionAt = now
+            if (motion.update(smallFrame, config)) {
+                if (now - lastMotionAt >= MOTION_HOLD_MS) motionArea = null // new event
+                lastMotionAt = now
+                motion.box?.let { b -> motionArea = motionArea?.apply { union(b) } ?: RectF(b) }
+            }
             now - lastMotionAt < MOTION_HOLD_MS
         }
         if (!moving || ocrBusy || now - lastOcrAt < ocrIntervalMs) return
@@ -192,11 +199,35 @@ class CameraStream(
         if (crop !== full) full.recycle()
 
         ocrBusy = true
-        recognizer.recognize(crop) { candidates ->
+        val regions = ocrRegions(crop.width, crop.height)
+        motionArea = null // next cycle starts a fresh motion area
+        recognizer.recognizeRegions(crop, regions) { candidates ->
             ocrBusy = false
             if (candidates.isEmpty()) crop.recycle()
             else listener.onPlates(config, candidates, crop, timestamp)
         }
+    }
+
+    /**
+     * Zoom-in strategy. Plates of two-wheelers are often only 60–80 px wide in a 720p/1080p
+     * frame – too small for OCR on the whole picture. So we OCR enlarged crops instead:
+     *  - the area where something moved (padded), when motion is localised, or
+     *  - the whole frame plus 2×2 overlapping tiles (each upscaled) otherwise.
+     */
+    private fun ocrRegions(w: Int, h: Int): List<Rect> {
+        val full = Rect(0, 0, w, h)
+        val m = motionArea
+        if (m != null && m.width() * m.height() < 0.5f) {
+            val padX = max(m.width() * 0.25f, 0.08f)
+            val padY = max(m.height() * 0.25f, 0.08f)
+            var l = (m.left - padX).coerceAtLeast(0f); var r = (m.right + padX).coerceAtMost(1f)
+            var t = (m.top - padY).coerceAtLeast(0f); var b = (m.bottom + padY).coerceAtMost(1f)
+            // at least 30 % of the frame so the plate is not cut off
+            if (r - l < 0.3f) { val c = (l + r) / 2; l = (c - 0.15f).coerceIn(0f, 0.7f); r = l + 0.3f }
+            if (b - t < 0.3f) { val c = (t + b) / 2; t = (c - 0.15f).coerceIn(0f, 0.7f); b = t + 0.3f }
+            return listOf(Rect((l * w).toInt(), (t * h).toInt(), (r * w).toInt(), (b * h).toInt()))
+        }
+        return listOf(full) + PlateRecognizer.tiles(w, h, 2, 2)
     }
 
     private fun roiRect(w: Int, h: Int): Rect {
@@ -234,11 +265,33 @@ class CameraStream(
             prev = c
             if (p == null || p.size != n) return false
 
+            val rw = x1 - x0
+            val rh = y1 - y0
             var changed = 0
-            for (i in 0 until n) if (abs(c[i] - p[i]) > PIXEL_DIFF) changed++
+            var minX = rw; var minY = rh; var maxX = -1; var maxY = -1
+            for (i in 0 until n) if (abs(c[i] - p[i]) > PIXEL_DIFF) {
+                changed++
+                val x = i % rw
+                val y = i / rw
+                // ignore isolated noise pixels for the bounding box
+                val right = i + 1 < n && x + 1 < rw && abs(c[i + 1] - p[i + 1]) > PIXEL_DIFF
+                val below = i + rw < n && abs(c[i + rw] - p[i + rw]) > PIXEL_DIFF
+                if (right || below) {
+                    if (x < minX) minX = x; if (x > maxX) maxX = x
+                    if (y < minY) minY = y; if (y > maxY) maxY = y
+                }
+            }
             val threshold = when (cfg.motionSensitivity) { 1 -> 0.03f; 2 -> 0.012f; else -> 0.005f }
-            return changed.toFloat() / n > threshold
+            val moving = changed.toFloat() / n > threshold
+            box = if (moving && maxX >= 0)
+                RectF(minX.toFloat() / rw, minY.toFloat() / rh, (maxX + 1).toFloat() / rw, (maxY + 1).toFloat() / rh)
+            else null
+            return moving
         }
+
+        /** Where the motion was in the last [update], as 0..1 of the region of interest. */
+        var box: RectF? = null
+            private set
 
         companion object {
             const val W = 128

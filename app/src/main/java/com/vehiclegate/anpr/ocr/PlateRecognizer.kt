@@ -37,9 +37,9 @@ class PlateRecognizer {
      * Asynchronously recognises plates in [bitmap]. [callback] is always invoked exactly once,
      * on a background thread. The caller keeps ownership of [bitmap].
      */
-    fun recognize(bitmap: Bitmap, callback: (List<Candidate>) -> Unit) {
+    fun recognize(bitmap: Bitmap, maxUpscale: Float = 2f, callback: (List<Candidate>) -> Unit) {
         // ML Kit wants characters ≥ ~16 px tall; upscale small regions of interest.
-        val scale = if (bitmap.width < MIN_OCR_WIDTH) min(2f, MIN_OCR_WIDTH.toFloat() / bitmap.width) else 1f
+        val scale = if (bitmap.width < MIN_OCR_WIDTH) min(maxUpscale, MIN_OCR_WIDTH.toFloat() / bitmap.width) else 1f
         val input = if (scale > 1.01f) {
             Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
         } else bitmap
@@ -60,6 +60,40 @@ class PlateRecognizer {
         } catch (e: Exception) {
             done(emptyList())
         }
+    }
+
+    /**
+     * Zoom-in OCR: crops each region of [bitmap], upscales it (up to 3×) so small plates get
+     * readable character heights, runs OCR on each in turn and merges the results.
+     * Box coordinates are returned in [bitmap] coordinates. Caller keeps ownership of [bitmap].
+     * [callback] is invoked once, on a background thread.
+     */
+    fun recognizeRegions(bitmap: Bitmap, regions: List<Rect>, callback: (List<Candidate>) -> Unit) {
+        val valid = regions.mapNotNull { r ->
+            val c = Rect(r)
+            if (!c.intersect(0, 0, bitmap.width, bitmap.height) || c.width() < 16 || c.height() < 16) null else c
+        }
+        val merged = HashMap<String, Candidate>()
+        fun next(i: Int) {
+            if (i >= valid.size) {
+                callback(merged.values.sortedByDescending { it.score }); return
+            }
+            val r = valid[i]
+            val isFull = r.width() == bitmap.width && r.height() == bitmap.height
+            val crop = if (isFull) bitmap else try {
+                Bitmap.createBitmap(bitmap, r.left, r.top, r.width(), r.height())
+            } catch (e: Exception) { next(i + 1); return }
+            recognize(crop, maxUpscale = 3f) { cands ->
+                if (crop !== bitmap) crop.recycle()
+                for (c in cands) {
+                    val moved = c.copy(box = Rect(c.box).apply { offset(r.left, r.top) })
+                    val prev = merged[c.plate.compact]
+                    if (prev == null || moved.score > prev.score) merged[c.plate.compact] = moved
+                }
+                next(i + 1)
+            }
+        }
+        next(0)
     }
 
     /** Releases the OCR model. In-flight requests complete with an empty result. */
@@ -133,6 +167,19 @@ class PlateRecognizer {
             (r.right / scale).toInt(), (r.bottom / scale).toInt())
 
     companion object {
+        /** cols×rows grid of overlapping tiles covering a w×h image (for zoom-in OCR). */
+        fun tiles(w: Int, h: Int, cols: Int, rows: Int, overlap: Float = 0.25f): List<Rect> {
+            val tw = (w / (cols - (cols - 1) * overlap)).toInt()
+            val th = (h / (rows - (rows - 1) * overlap)).toInt()
+            val out = ArrayList<Rect>()
+            for (r in 0 until rows) for (c in 0 until cols) {
+                val x = if (cols == 1) 0 else ((w - tw) * c / (cols - 1))
+                val y = if (rows == 1) 0 else ((h - th) * r / (rows - 1))
+                out += Rect(x, y, x + tw, y + th)
+            }
+            return out
+        }
+
         /** Shared and never shut down, so late ML Kit callbacks after close() are still delivered safely. */
         private val callbackExecutor = Executors.newSingleThreadExecutor()
         private const val MIN_OCR_WIDTH = 1280

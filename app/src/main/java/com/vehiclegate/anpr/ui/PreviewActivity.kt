@@ -173,7 +173,7 @@ class PreviewActivity : AppCompatActivity() {
                 p.stats()?.let { st ->
                     if (lastRendered >= 0) fps = st.displayedFrames - lastRendered
                     lastRendered = st.displayedFrames
-                    sb.append("Frame rate : $fps fps   lost: ${st.lostFrames}   input: ${st.inputKbps} kbit/s\n")
+                    sb.append("Frame rate : $fps fps   lost: ${st.lostFrames}\n")
                 }
             }
             if (firstFrameMs >= 0) sb.append("First frame: ${firstFrameMs} ms after connect\n")
@@ -205,9 +205,12 @@ class PreviewActivity : AppCompatActivity() {
         else Bitmap.createBitmap(full, l, t, r - l, bt - t).also { full.recycle() }
 
         ocrBusy = true
-        showOcr("Reading…", ok = true)
+        showOcr("Reading… (whole frame + 6 zoomed tiles)", ok = true)
         val started = SystemClock.elapsedRealtime()
-        rec.recognize(crop) { cands ->
+        // Whole frame + 3×2 zoomed tiles, so small two-wheeler plates are readable too.
+        val regions = listOf(android.graphics.Rect(0, 0, crop.width, crop.height)) +
+            PlateRecognizer.tiles(crop.width, crop.height, 3, 2)
+        rec.recognizeRegions(crop, regions) { cands ->
             val ms = SystemClock.elapsedRealtime() - started
             crop.recycle()
             runOnUiThread {
