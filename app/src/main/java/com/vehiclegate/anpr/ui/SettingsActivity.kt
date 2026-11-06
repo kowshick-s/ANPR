@@ -48,8 +48,18 @@ class SettingsActivity : AppCompatActivity() {
         b.addCamera.requestFocus()
     }
 
+    /** The Add/Edit camera window currently open (to refresh its area after Preview). */
+    private var openDialog: Pair<DialogCameraBinding, String>? = null
+
     override fun onResume() {
         super.onResume()
+        // An area saved in Preview while the Edit window was open: show the new numbers in it.
+        openDialog?.let { (d, id) ->
+            app.settingsStore.cameras().firstOrNull { it.id == id }?.let { c ->
+                d.roiL.setText(c.roiLeft.toString()); d.roiT.setText(c.roiTop.toString())
+                d.roiR.setText(c.roiRight.toString()); d.roiB.setText(c.roiBottom.toString())
+            }
+        }
         // Reload every time: Preview may have saved a new search area for a camera.
         cameras.clear()
         cameras += app.settingsStore.cameras()
@@ -124,6 +134,8 @@ class SettingsActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
         }
+        openDialog = d to c.id
+        dialog.setOnDismissListener { if (openDialog?.first === d) openDialog = null }
         // Test / preview what is typed in the dialog, before saving.
         d.dlgTest.setOnClickListener {
             readCameraDialog(d, c)?.let { RtspTestDialog.show(this, it.name, it.url) }

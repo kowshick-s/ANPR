@@ -24,7 +24,7 @@
         <CheckBox android:id="@+id/enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enabled" android:textColor="@color/text" />
         <CheckBox android:id="@+id/tcp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use TCP transport (recommended)" android:textColor="@color/text" />
 
-        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Plate search area, % of frame (left, top, right, bottom). Narrow it to the lane to avoid reading signboards." />
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Plate search area, % of frame (left, top, right, bottom). Easiest: press ▶ Preview → ✏ Set search area and draw it on the video – these numbers fill in automatically." />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
             <EditText android:id="@+id/roiL" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="0" android:inputType="number" />
             <EditText android:id="@+id/roiT" style="@style/Field" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:layout_weight="1" android:hint="0" android:inputType="number" />
