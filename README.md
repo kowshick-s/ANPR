@@ -62,7 +62,7 @@ Each camera in Settings has two buttons. They are also in the Add/Edit camera di
 * **Test** – a step-by-step RTSP handshake, independent of the video player:
   `URL → DNS → TCP connect → OPTIONS → DESCRIBE (+ Digest/Basic login) → SDP (codec, resolution, fps) → SETUP (TCP) → PLAY → video packets (bitrate, keyframe) → TEARDOWN`.
   Each step shows ✔/✘ with timing, plus a plain-English fix for the failing step, e.g. "Wrong username or password", "Stream path/channel not found", "Connection refused – RTSP disabled or wrong port", "Camera does not support TCP – untick Use TCP".
-* **▶ Preview** – full-screen live view of that one camera with codec, resolution, real frame rate, dropped frames and time to first frame. The plate search area is drawn on the picture. **Read plate now** runs OCR on the current frame and boxes the plates it finds, with the plate width in pixels. You can switch TCP/UDP and reconnect. The stream closes when you leave the screen.
+* **▶ Preview** – full-screen live view (VLC engine) of that one camera with codec, resolution, real frame rate, dropped frames and time to first frame. The plate search area is drawn on the picture. **Read plate now** runs OCR on the current frame and boxes the plates it finds, with the plate width in pixels. You can switch TCP/UDP and reconnect. The stream closes when you leave the screen.
 
 By default the dashboard shows small status chips instead of live video (*Settings → Show live camera video on the dashboard* turns video back on). Detection runs either way.
 
