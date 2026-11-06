@@ -103,8 +103,15 @@ class VlcPlayer(
         listener.onVideoSize(width, height)
     }
 
+    /** Re-reads the resolution from the playing track (safe to call often). */
+    fun refreshSize() {
+        if (videoWidth > 0) return
+        try { player?.currentVideoTrack?.let { updateSize(it.width, it.height) } } catch (_: Exception) {}
+    }
+
     /** Codec FourCC (h264 / hevc …), resolution and frame rate of the playing track. */
     fun trackInfo(): String? {
+        refreshSize()
         val t = player?.currentVideoTrack ?: return null
         val fps = if (t.frameRateDen > 0) t.frameRateNum.toFloat() / t.frameRateDen else 0f
         return "${t.codec?.uppercase() ?: "?"} ${t.width}x${t.height}" +

@@ -189,14 +189,24 @@ class PreviewActivity : AppCompatActivity() {
 
     private fun readPlateNow() {
         val rec = recognizer ?: return
-        if (state != "LIVE" || videoW <= 0 || !b.video.isAvailable) {
-            showOcr("No video yet – wait for the picture to appear.", ok = false); return
+        player?.refreshSize()
+        if (state != "LIVE") {
+            showOcr("No video yet – wait for the picture to appear. (state: $state)", ok = false); return
         }
         if (ocrBusy) return
-        val scale = min(1f, 1920f / videoW)
-        val fw = max(2, (videoW * scale).toInt())
-        val fh = max(2, (videoH * scale).toInt())
-        val full = b.video.getBitmap(fw, fh) ?: return
+        // Native size if known; otherwise 1920 wide with the on-screen aspect ratio.
+        val vw = if (videoW > 0) videoW else 1920
+        val vh = if (videoH > 0) videoH else
+            (1920f * b.video.height.coerceAtLeast(1) / b.video.width.coerceAtLeast(1)).toInt()
+        val scale = min(1f, 1920f / vw)
+        val fw = max(2, (vw * scale).toInt())
+        val fh = max(2, (vh * scale).toInt())
+        val full = try { b.video.getBitmap(fw, fh) } catch (e: Exception) { null }
+        if (full == null) {
+            showOcr("Could not grab a frame from the video (available=${b.video.isAvailable}, " +
+                "size=${videoW}x$videoH, view=${b.video.width}x${b.video.height}). Press Reconnect and try again.", ok = false)
+            return
+        }
         val l = fw * cam.roiLeft.coerceIn(0, 95) / 100
         val t = fh * cam.roiTop.coerceIn(0, 95) / 100
         val r = max(l + 16, fw * cam.roiRight.coerceIn(5, 100) / 100).coerceAtMost(fw)

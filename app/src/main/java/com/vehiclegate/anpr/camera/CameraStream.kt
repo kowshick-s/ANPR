@@ -168,7 +168,7 @@ class CameraStream(
     }
 
     private fun analyseFrame() {
-        if (status != Status.LIVE || !textureView.isAvailable) return
+        if (status != Status.LIVE) return
         val now = SystemClock.elapsedRealtime()
 
         val moving = if (config.motionSensitivity == 0) {
@@ -183,13 +183,16 @@ class CameraStream(
             now - lastMotionAt < MOTION_HOLD_MS
         }
         if (!moving || ocrBusy || now - lastOcrAt < ocrIntervalMs) return
-        if (videoW <= 0 || videoH <= 0) return
+        if (videoW <= 0) player?.refreshSize()
         lastOcrAt = now
 
         // Grab at native resolution (capped at 1920 wide) regardless of the tile's size on screen.
-        val scale = min(1f, MAX_OCR_FRAME_WIDTH.toFloat() / videoW)
-        val fw = max(2, (videoW * scale).toInt())
-        val fh = max(2, (videoH * scale).toInt())
+        // If the resolution is still unknown, fall back to 1920×1080.
+        val vw = if (videoW > 0) videoW else 1920
+        val vh = if (videoH > 0) videoH else 1080
+        val scale = min(1f, MAX_OCR_FRAME_WIDTH.toFloat() / vw)
+        val fw = max(2, (vw * scale).toInt())
+        val fh = max(2, (vh * scale).toInt())
         val timestamp = System.currentTimeMillis()
         val full = textureView.getBitmap(fw, fh) ?: return
 
