@@ -150,4 +150,15 @@ class AnprCoreTest {
             IndianPlateParser.strict = false
         }
     }
+
+    @Test fun parkingFeeIsPerStartedPeriod() {
+        val h = 3_600_000L
+        assertEquals(10, ParkingFee.amount(0, 2 * h, 10, 24))      // 2 h
+        assertEquals(10, ParkingFee.amount(0, 24 * h, 10, 24))     // exactly 24 h
+        assertEquals(20, ParkingFee.amount(0, 25 * h, 10, 24))     // 25 h -> 2 periods
+        assertEquals(10, ParkingFee.amount(0, 0, 10, 24))          // minimum one period
+        assertEquals(45, ParkingFee.amount(0, 30 * h, 15, 12))     // ₹15 per 12 h, 30 h -> 3 periods
+        assertEquals("2h 05m", ParkingFee.duration(0, 2 * h + 5 * 60_000))
+        assertEquals("1d 3h", ParkingFee.duration(0, 27 * h))
+    }
 }

@@ -82,6 +82,42 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Parking -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PARKING"
+                android:textColor="@color/accent"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Parking fee (₹) for every started period" />
+            <EditText android:id="@+id/feeAmount" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Period (hours) – e.g. 24 = ₹ per day; 25 h parked = 2 periods" />
+            <EditText android:id="@+id/feePeriodHours" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minimum stay (minutes) – a parked vehicle seen again sooner is still at the gate, not leaving" />
+            <EditText android:id="@+id/minStayMinutes" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/monthlyUsers"
+                style="@style/TvButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Monthly users (master list) →"
+                android:textColor="@color/monthly_text" />
+        </LinearLayout>
+
         <!-- Detection -->
         <LinearLayout
             android:layout_width="match_parent"

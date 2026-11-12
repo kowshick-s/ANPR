@@ -53,6 +53,7 @@ class SettingsActivity : AppCompatActivity() {
         b.clearHistory.setOnClickListener { confirmClear() }
         b.exportCsv.setOnClickListener { exportCsv() }
         b.exportSettings.setOnClickListener { backupSettings() }
+        b.monthlyUsers.setOnClickListener { startActivity(android.content.Intent(this, MonthlyUsersActivity::class.java)) }
         b.importSettings.setOnClickListener {
             try {
                 pickBackup.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
@@ -110,7 +111,17 @@ class SettingsActivity : AppCompatActivity() {
                     val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
                         ?: return@withContext "Could not read the file"
                     val n = app.settingsStore.importJson(text)
-                    "Restored $n camera(s) and all settings"
+                    var members = 0
+                    org.json.JSONObject(text).optJSONArray("monthlyUsers")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            val o = arr.getJSONObject(i)
+                            app.db.members().upsert(com.vehiclegate.anpr.data.MonthlyMember(
+                                o.getString("plate"), o.optString("name"), o.optString("phone"),
+                                if (o.isNull("validTill")) null else o.optLong("validTill"), o.optString("notes")))
+                            members++
+                        }
+                    }
+                    "Restored $n camera(s), $members monthly user(s) and all settings"
                 } catch (e: Exception) {
                     "Restore failed: ${e.message}"
                 }
@@ -126,7 +137,15 @@ class SettingsActivity : AppCompatActivity() {
         save() // include anything typed on this screen
         lifecycleScope.launch {
             val where = withContext(Dispatchers.IO) {
-                val json = app.settingsStore.exportJson()
+                // settings + cameras + monthly users master list
+                val json = org.json.JSONObject(app.settingsStore.exportJson()).apply {
+                    val arr = org.json.JSONArray()
+                    app.db.members().all().forEach { m ->
+                        arr.put(org.json.JSONObject().put("plate", m.plate).put("name", m.name).put("phone", m.phone)
+                            .put("validTill", m.validTill ?: org.json.JSONObject.NULL).put("notes", m.notes))
+                    }
+                    put("monthlyUsers", arr)
+                }.toString(2)
                 val name = "vehicle_gate_settings.json"
                 try {
                     if (Build.VERSION.SDK_INT >= 29) {
@@ -318,6 +337,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun loadSettings(s: AppSettings) {
         b.siteTitle.setText(s.siteTitle)
         b.commonStates.setText(s.commonStates)
+        b.feeAmount.setText(s.feeAmount.toString())
+        b.feePeriodHours.setText(s.feePeriodHours.toString())
+        b.minStayMinutes.setText(s.minStayMinutes.toString())
         b.strictStates.isChecked = s.strictStates
         b.movingOnly.isChecked = s.movingOnly
         b.cooldown.setText(s.cooldownSec.toString())
@@ -346,6 +368,9 @@ class SettingsActivity : AppCompatActivity() {
                 commonStates = com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(b.commonStates.text.toString())
                     .joinToString(",").ifEmpty { d.commonStates },
                 strictStates = b.strictStates.isChecked,
+                feeAmount = b.feeAmount.int(d.feeAmount).coerceIn(0, 100_000),
+                feePeriodHours = b.feePeriodHours.int(d.feePeriodHours).coerceIn(1, 24 * 31),
+                minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(1, 24 * 60),
                 movingOnly = b.movingOnly.isChecked
             )
         )
@@ -383,11 +408,17 @@ class SettingsActivity : AppCompatActivity() {
                 val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
                 val tf = SimpleDateFormat("HH:mm:ss", Locale.US)
                 val csv = buildString {
-                    append("Vehicle Number,Date,Entry Time,Confidence %,Reads,Cameras,Per-camera reads\n")
+                    append("Vehicle Number,Type,Token,Name,Date In,Time In,Status,Date Out,Time Out,Amount,Confidence %,Reads,Cameras\n")
+                    fun q(v: String?) = "\"" + (v ?: "").replace("\"", "'") + "\""
                     rows.forEach { e ->
-                        val perCam = e.cameraSummary.lines().joinToString(" ; ") { it.replace("|", " ") }
-                        append("${e.plateFormatted},${df.format(Date(e.entryTime))},${tf.format(Date(e.entryTime))}," +
-                            "${(e.confidence * 100).toInt()},${e.totalReads},${e.cameraCount},\"${perCam.replace("\"", "'")}\"\n")
+                        val out = e.exitTime ?: e.exitDetectedAt
+                        append(listOf(
+                            e.plateFormatted, if (e.isMonthly) "Monthly" else "Daily", q(e.token), q(e.name),
+                            df.format(Date(e.entryTime)), tf.format(Date(e.entryTime)), e.state,
+                            out?.let { df.format(Date(it)) } ?: "", out?.let { tf.format(Date(it)) } ?: "",
+                            (e.amount ?: "").toString(), (e.confidence * 100).toInt().toString(),
+                            e.totalReads.toString(), e.cameraCount.toString()
+                        ).joinToString(",")).append("\n")
                     }
                 }
                 val name = "vehicle_entries_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.csv"

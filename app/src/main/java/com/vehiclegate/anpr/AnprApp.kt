@@ -7,4 +7,5 @@ import com.vehiclegate.anpr.data.SettingsStore
 class AnprApp : Application() {
     val db: AppDatabase by lazy { AppDatabase.create(this) }
     val settingsStore: SettingsStore by lazy { SettingsStore(this) }
+    val parking: ParkingDesk by lazy { ParkingDesk(this) }
 }

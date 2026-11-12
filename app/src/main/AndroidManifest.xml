@@ -49,6 +49,11 @@
             android:screenOrientation="sensorLandscape" />
 
         <activity
+            android:name=".ui.MonthlyUsersActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.SettingsActivity"
             android:exported="false"
             android:label="@string/settings"

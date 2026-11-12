@@ -41,7 +41,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
-    private val adapter = EntryAdapter()
+    private val parkedAdapter = ParkedAdapter(onClick = { editParked(it) }, onLongClick = { confirmDelete(it) })
+    private val leavingAdapter = LeavingAdapter(
+        amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
+        onCheckout = { confirmCheckout(it) },
+        onNotLeaving = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.cancelExit(e) } } }
+    )
+    private var latest: VehicleEntry? = null
     private val handler = Handler(Looper.getMainLooper())
 
     private class Tile(val root: View, val picture: ImageView, val dot: ImageView,
@@ -77,17 +83,31 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        b.entries.layoutManager = LinearLayoutManager(this)
-        b.entries.adapter = adapter
-        b.entries.itemAnimator = null
+        b.parkedList.layoutManager = LinearLayoutManager(this)
+        b.parkedList.adapter = parkedAdapter
+        b.parkedList.itemAnimator = null
+        b.leavingList.layoutManager = LinearLayoutManager(this)
+        b.leavingList.adapter = leavingAdapter
+        b.leavingList.itemAnimator = null
+        b.saveDetails.setOnClickListener { saveLatestDetails() }
         b.settingsButton.setOnClickListener { openSettings() }
         b.exitButton.setOnClickListener { confirmExit() }
         askPermissionsOnce()
 
         lifecycleScope.launch {
-            app.db.entries().recent(50).collect { list ->
-                adapter.submit(list)
-                showLatest(list.firstOrNull())
+            app.db.entries().latestCheckIn().collect { showLatest(it) }
+        }
+        lifecycleScope.launch {
+            app.db.entries().parked().collect { list ->
+                parkedAdapter.submit(list)
+                b.parkedTitle.text = "PARKED NOW (${list.size}) · tap to edit / check out"
+            }
+        }
+        lifecycleScope.launch {
+            app.db.entries().leaving().collect { list ->
+                leavingAdapter.submit(list)
+                b.leavingTitle.text = "CHECK-OUT · seen leaving (${list.size})"
+                b.leavingEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             }
         }
     }
@@ -266,6 +286,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
     // ------------------------------------------------------------------ latest vehicle
 
+    override fun onVehicleLeaving(entry: VehicleEntry) {
+        b.lastEvent.text = "Leaving: ${entry.plateFormatted} – collect ₹${entry.amount ?: 0} and press Check out"
+    }
+
+    override fun onAutoCheckedOut(entry: VehicleEntry) {
+        b.lastEvent.text = "Monthly user checked out automatically: ${entry.plateFormatted} (${timeFmt.format(Date(entry.exitTime ?: 0))})"
+    }
+
     override fun onVehicleSaved(entry: VehicleEntry) {
         // The Room flow will refresh the list; flash the plate to draw attention.
         b.plateBox.animate().cancel()
@@ -274,8 +302,11 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     }
 
     private fun showLatest(e: VehicleEntry?) {
+        latest = e
         if (e == null) {
             shownLatestId = -1
+            b.monthlyTag.visibility = View.GONE
+            b.tokenInput.setText(""); b.nameInput.setText("")
             b.latestPlate.text = "— — —"
             b.latestDate.text = getString(R.string.waiting)
             b.latestTime.text = ""
@@ -284,8 +315,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             b.latestSnapshot.setImageDrawable(null)
             return
         }
+        // monthly users in a different colour
+        b.monthlyTag.visibility = if (e.isMonthly) View.VISIBLE else View.GONE
+        b.latestPlate.setTextColor(ContextCompat.getColor(this, if (e.isMonthly) R.color.monthly else R.color.plate_text))
         if (e.id == shownLatestId) return
         shownLatestId = e.id
+        // new check-in: token is entered fresh every day, name comes from history / monthly list
+        b.tokenInput.setText(e.token ?: "")
+        b.nameInput.setText(e.name ?: "")
         b.latestPlate.text = e.plateFormatted
         b.latestDate.text = dateFmt.format(Date(e.entryTime))
         b.latestTime.text = timeFmt.format(Date(e.entryTime))
@@ -301,6 +338,82 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
             if (shownLatestId == e.id) b.latestSnapshot.setImageBitmap(bmp)
         }
+    }
+
+    // ------------------------------------------------------------------ parking actions
+
+    private fun hideKeyboard() {
+        (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .hideSoftInputFromWindow(b.root.windowToken, 0)
+    }
+
+    /** Token / name for the latest check-in. */
+    private fun saveLatestDetails() {
+        val e = latest ?: return
+        val token = b.tokenInput.text.toString()
+        val name = b.nameInput.text.toString()
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { app.parking.saveDetails(e, token, name) }
+            hideKeyboard()
+            android.widget.Toast.makeText(this@MainActivity, "Saved for ${e.plateFormatted}", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Tap a parked vehicle: edit token/name, or check it out by hand. */
+    private fun editParked(e: VehicleEntry) {
+        val d = com.vehiclegate.anpr.databinding.DialogEntryBinding.inflate(layoutInflater)
+        val settings = app.settingsStore.settings()
+        val due = app.parking.amountDue(e, settings)
+        d.info.text = "Checked in ${dateFmt.format(Date(e.entryTime))} ${timeFmt.format(Date(e.entryTime))}" +
+            " · parked ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, System.currentTimeMillis())}" +
+            if (e.isMonthly) " · MONTHLY user" else " · due now ₹$due"
+        d.token.setText(e.token ?: "")
+        d.name.setText(e.name ?: "")
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(e.plateFormatted)
+            .setView(d.root)
+            .setPositiveButton("Save") { _, _ ->
+                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString()) } }
+            }
+            .setNeutralButton(if (e.isMonthly) "Check out" else "Check out ₹$due") { _, _ ->
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString())
+                        app.parking.checkOut(e.copy(token = d.token.text.toString().trim(), name = d.name.text.toString().trim()), settings)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Leaving vehicle: show the amount, staff collects money and confirms. */
+    private fun confirmCheckout(e: VehicleEntry) {
+        val settings = app.settingsStore.settings()
+        val amount = app.parking.amountDue(e, settings)
+        val out = e.exitDetectedAt ?: System.currentTimeMillis()
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("${e.plateFormatted} – collect ₹$amount")
+            .setMessage("${e.whoText()}\nIn: ${dateFmt.format(Date(e.entryTime))} ${timeFmt.format(Date(e.entryTime))}" +
+                "\nOut: ${timeFmt.format(Date(out))}\nParked: ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, out)}" +
+                "\nFee: ₹${settings.feeAmount} per ${settings.feePeriodHours} h")
+            .setPositiveButton("Collected ₹$amount – Check out") { _, _ ->
+                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.checkOut(e, settings) } }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Long-press a parked vehicle: remove a wrong read. */
+    private fun confirmDelete(e: VehicleEntry) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Delete ${e.plateFormatted}?")
+            .setMessage("Use this only for a wrong read (no such vehicle). It is removed from the records.")
+            .setPositiveButton("Delete") { _, _ ->
+                lifecycleScope.launch { withContext(Dispatchers.IO) { app.db.entries().delete(e) } }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     /** "Gate Cam 1|TN 09 AB 1234|92|3|1" lines → aligned comparison text. */
@@ -325,7 +438,10 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
                 countDayStart = dayStart
                 countJob?.cancel()
                 countJob = lifecycleScope.launch {
-                    app.db.entries().countSince(dayStart).collect { b.todayCount.text = "Today: $it" }
+                    launch { app.db.entries().countSince(dayStart).collect { b.todayCount.text = "In today: $it" } }
+                    val dao = app.db.entries()
+                    kotlinx.coroutines.flow.combine(dao.outCountSince(dayStart), dao.collectedSince(dayStart)) { n, amt -> n to amt }
+                        .collect { (n, amt) -> b.outCount.text = "Out: $n · ₹$amt" }
                 }
             }
             handler.postDelayed(this, 1000 - now % 1000)

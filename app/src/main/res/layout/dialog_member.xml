@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="Vehicle number" />
+        <EditText android:id="@+id/plate" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="TN 09 AB 1234" android:inputType="textCapCharacters" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Name" />
+        <EditText android:id="@+id/name" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textPersonName|textCapWords" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Phone (optional)" />
+        <EditText android:id="@+id/phone" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="phone" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Valid till (DD-MM-YYYY, optional – empty = no end date)" />
+        <EditText android:id="@+id/validTill" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="30-11-2026" android:inputType="date" />
+
+        <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes (optional)" />
+        <EditText android:id="@+id/notes" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
+    </LinearLayout>
+</ScrollView>

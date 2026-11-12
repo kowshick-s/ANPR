@@ -37,8 +37,23 @@
         android:paddingRight="12dp"
             android:paddingTop="4dp"
         android:paddingBottom="4dp"
-            android:text="Today: 0"
+            android:text="In: 0"
             android:textColor="@color/accent"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/outCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/focus_bg"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="Out: 0 · ₹0"
+            android:textColor="@color/live"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -78,34 +93,56 @@
         android:baselineAligned="false"
         android:orientation="horizontal">
 
-        <!-- Latest entry -->
+        <!-- Latest check-in -->
         <LinearLayout
             android:id="@+id/latestCard"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginEnd="12dp"
-            android:layout_weight="3"
+            android:layout_weight="4"
             android:background="@drawable/card_bg"
             android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:letterSpacing="0.15"
-                android:text="@string/latest_entry"
-                android:textColor="@color/accent"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            android:padding="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <!-- Number plate -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.15"
+                    android:text="LATEST CHECK-IN"
+                    android:textColor="@color/accent"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/monthlyTag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/monthly_tag_bg"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:paddingTop="1dp"
+                    android:paddingBottom="1dp"
+                    android:text="MONTHLY"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
                 <LinearLayout
                     android:id="@+id/plateBox"
                     android:layout_width="wrap_content"
@@ -113,7 +150,7 @@
                     android:background="@drawable/plate_bg"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:padding="6dp">
+                    android:padding="5dp">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -121,11 +158,11 @@
                         android:background="@drawable/ind_strip"
                         android:gravity="bottom|center_horizontal"
                         android:paddingLeft="4dp"
-        android:paddingRight="4dp"
-                        android:paddingBottom="4dp"
+                        android:paddingRight="4dp"
+                        android:paddingBottom="3dp"
                         android:text="IND"
                         android:textColor="#FFFFFF"
-                        android:textSize="11sp"
+                        android:textSize="10sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -133,19 +170,19 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-condensed"
-                        android:paddingLeft="14dp"
-        android:paddingRight="14dp"
+                        android:paddingLeft="10dp"
+                        android:paddingRight="10dp"
                         android:singleLine="true"
                         android:text="— — —"
                         android:textColor="@color/plate_text"
-                        android:textSize="50sp"
+                        android:textSize="36sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="18dp"
+                    android:layout_marginStart="14dp"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
@@ -155,7 +192,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/waiting"
                         android:textColor="@color/text"
-                        android:textSize="22sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -164,7 +201,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:textColor="@color/accent"
-                        android:textSize="28sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -172,14 +209,52 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/text_dim"
-                        android:textSize="13sp" />
+                        android:textSize="12sp" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <!-- Staff enters token / name for the latest check-in -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/tokenInput"
+                    style="@style/Field"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="2"
+                    android:hint="Token no."
+                    android:imeOptions="actionNext"
+                    android:inputType="text" />
+
+                <EditText
+                    android:id="@+id/nameInput"
+                    style="@style/Field"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="3"
+                    android:hint="Name"
+                    android:imeOptions="actionDone"
+                    android:inputType="textPersonName|textCapWords" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/saveDetails"
+                    style="@style/TvButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="Save" />
             </LinearLayout>
 
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:layout_weight="1"
                 android:background="@drawable/tile_bg">
 
@@ -195,97 +270,99 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:padding="20dp"
+                    android:padding="16dp"
                     android:textColor="@color/text_dim"
-                    android:textSize="16sp" />
+                    android:textSize="14sp" />
             </FrameLayout>
 
-            <!-- Per-camera comparison for the latest vehicle -->
             <TextView
                 android:id="@+id/latestCameras"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:fontFamily="monospace"
-                android:maxLines="4"
+                android:maxLines="2"
                 android:textColor="@color/text_dim"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
 
-            <!-- Diagnostics: plates read but not logged, and why -->
             <TextView
                 android:id="@+id/lastEvent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:singleLine="true"
                 android:textColor="@color/warn"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Recent entries -->
+        <!-- Right: check-out and parked -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="2"
-            android:background="@drawable/card_bg"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:letterSpacing="0.15"
-                android:text="@string/recent_entries"
-                android:textColor="@color/accent"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            android:layout_weight="5"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:paddingLeft="8dp"
-        android:paddingRight="8dp"
-                android:paddingBottom="6dp">
+                android:layout_height="0dp"
+                android:layout_weight="4"
+                android:background="@drawable/checkout_card_bg"
+                android:orientation="vertical"
+                android:padding="12dp">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:id="@+id/leavingTitle"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="5"
-                    android:text="@string/col_vehicle"
+                    android:letterSpacing="0.1"
+                    android:text="CHECK-OUT · seen leaving (0)"
+                    android:textColor="@color/live"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/leavingEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:text="Vehicles seen leaving appear here with the amount to collect."
                     android:textColor="@color/text_dim"
                     android:textSize="13sp" />
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="3"
-                    android:text="@string/col_date"
-                    android:textColor="@color/text_dim"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="3"
-                    android:gravity="end"
-                    android:text="@string/col_time"
-                    android:textColor="@color/text_dim"
-                    android:textSize="13sp" />
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/leavingList"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_weight="1" />
             </LinearLayout>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/divider" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/entries"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:focusable="true" />
+                android:layout_marginTop="12dp"
+                android:layout_weight="6"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/parkedTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.1"
+                    android:text="PARKED NOW (0) · tap to edit / check out"
+                    android:textColor="@color/accent"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/parkedList"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

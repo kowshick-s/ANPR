@@ -47,7 +47,13 @@ class AnprPipeline(
         /** Plate-reading activity per camera (main thread). */
         fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {}
 
-        /** A new vehicle entry was stored. Main thread. */
+        /** A parked (daily) vehicle was seen leaving – waits in the CHECK-OUT list. Main thread. */
+        fun onVehicleLeaving(entry: VehicleEntry) {}
+
+        /** A monthly vehicle was seen leaving and checked out automatically. Main thread. */
+        fun onAutoCheckedOut(entry: VehicleEntry) {}
+
+        /** A new vehicle was checked in. Main thread. */
         fun onVehicleSaved(entry: VehicleEntry)
     }
 
@@ -180,9 +186,17 @@ class AnprPipeline(
                     cameraSummary = summary,
                     snapshotPath = path
                 )
-                e.copy(id = app.db.entries().insert(e))
+                // Parking rules decide: check-in, leaving, auto check-out or ignore.
+                val r = app.parking.onDetected(e, app.settingsStore.settings())
+                if (r !is ParkingDesk.Result.CheckedIn) path?.let { File(it).delete() }
+                r
             }
-            events.onVehicleSaved(entry)
+            when (entry) {
+                is ParkingDesk.Result.CheckedIn -> events.onVehicleSaved(entry.entry)
+                is ParkingDesk.Result.Leaving -> events.onVehicleLeaving(entry.entry)
+                is ParkingDesk.Result.AutoCheckedOut -> events.onAutoCheckedOut(entry.entry)
+                is ParkingDesk.Result.Ignored -> events.onSkipped(entry.plate, entry.reason)
+            }
         }
     }
 

@@ -13,4 +13,6 @@
     <color name="plate_bg">#FFFFFF</color>
     <color name="plate_text">#111111</color>
     <color name="ind_blue">#1A3E9A</color>
+    <color name="monthly">#9C6ADE</color>
+    <color name="monthly_text">#C9A8FF</color>
 </resources>

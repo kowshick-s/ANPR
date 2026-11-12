@@ -64,7 +64,12 @@ data class AppSettings(
     /** Reject plates whose state is not in [commonStates], and require the full plate format. */
     val strictStates: Boolean = true,
     /** Log only plates that were moving (vehicle being ridden/driven), ignore parked vehicles. */
-    val movingOnly: Boolean = true
+    val movingOnly: Boolean = true,
+    /** Parking fee in rupees for every started period of [feePeriodHours]. */
+    val feeAmount: Int = 10,
+    val feePeriodHours: Int = 24,
+    /** A parked vehicle seen again sooner than this is still at the gate, not leaving. */
+    val minStayMinutes: Int = 10
 )
 
 class SettingsStore(context: Context) {
@@ -100,7 +105,10 @@ class SettingsStore(context: Context) {
             siteTitle = prefs.getString("siteTitle", d.siteTitle) ?: d.siteTitle,
             commonStates = prefs.getString("commonStates", d.commonStates) ?: d.commonStates,
             strictStates = prefs.getBoolean("strictStates", d.strictStates),
-            movingOnly = prefs.getBoolean("movingOnly", d.movingOnly)
+            movingOnly = prefs.getBoolean("movingOnly", d.movingOnly),
+            feeAmount = prefs.getInt("feeAmount", d.feeAmount),
+            feePeriodHours = prefs.getInt("feePeriodHours", d.feePeriodHours),
+            minStayMinutes = prefs.getInt("minStayMinutes", d.minStayMinutes)
         )
     }
 
@@ -118,6 +126,9 @@ class SettingsStore(context: Context) {
             .putString("commonStates", s.commonStates)
             .putBoolean("strictStates", s.strictStates)
             .putBoolean("movingOnly", s.movingOnly)
+            .putInt("feeAmount", s.feeAmount)
+            .putInt("feePeriodHours", s.feePeriodHours)
+            .putInt("minStayMinutes", s.minStayMinutes)
             .apply()
     }
 
@@ -132,6 +143,8 @@ class SettingsStore(context: Context) {
             .put("retentionDays", st.retentionDays).put("showLiveVideo", st.showLiveVideo)
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
             .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
+            .put("feeAmount", st.feeAmount).put("feePeriodHours", st.feePeriodHours)
+            .put("minStayMinutes", st.minStayMinutes)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -157,7 +170,10 @@ class SettingsStore(context: Context) {
                 siteTitle = j.optString("siteTitle", d.siteTitle),
                 commonStates = j.optString("commonStates", d.commonStates),
                 strictStates = j.optBoolean("strictStates", d.strictStates),
-                movingOnly = j.optBoolean("movingOnly", d.movingOnly)
+                movingOnly = j.optBoolean("movingOnly", d.movingOnly),
+                feeAmount = j.optInt("feeAmount", d.feeAmount),
+                feePeriodHours = j.optInt("feePeriodHours", d.feePeriodHours),
+                minStayMinutes = j.optInt("minStayMinutes", d.minStayMinutes)
             ))
         }
         return cams.size
