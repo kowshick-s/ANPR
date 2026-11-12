@@ -41,7 +41,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
-    private val parkedAdapter = ParkedAdapter(onClick = { editParked(it) }, onLongClick = { confirmDelete(it) })
+    private val parkedAdapter = CheckInAdapter(
+        onSave = { e, t, n, m ->
+            lifecycleScope.launch(Dispatchers.IO) { app.parking.saveDetails(e, t, n, m) }
+        },
+        onPlateClick = { editParked(it) },
+        onLongClick = { confirmDelete(it) }
+    )
     private val leavingAdapter = LeavingAdapter(
         amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
         onCheckout = { confirmCheckout(it) },
@@ -89,24 +95,20 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         b.leavingList.layoutManager = LinearLayoutManager(this)
         b.leavingList.adapter = leavingAdapter
         b.leavingList.itemAnimator = null
-        b.saveDetails.setOnClickListener { saveLatestDetails() }
         b.settingsButton.setOnClickListener { openSettings() }
         b.exitButton.setOnClickListener { confirmExit() }
         askPermissionsOnce()
 
         lifecycleScope.launch {
-            app.db.entries().latestCheckIn().collect { showLatest(it) }
-        }
-        lifecycleScope.launch {
             app.db.entries().parked().collect { list ->
-                parkedAdapter.submit(list)
-                b.parkedTitle.text = "PARKED NOW (${list.size}) · tap to edit / check out"
+                parkedAdapter.submitList(list)
+                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · type Token / Name / Model in the row · tap number for more"
             }
         }
         lifecycleScope.launch {
             app.db.entries().leaving().collect { list ->
                 leavingAdapter.submit(list)
-                b.leavingTitle.text = "CHECK-OUT · seen leaving (${list.size})"
+                b.leavingTitle.text = "CHECK-OUT (${list.size}) · collect and press Check out"
                 b.leavingEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             }
         }
@@ -118,7 +120,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         b.title.text = settings.siteTitle
         val cameras = app.settingsStore.cameras().filter { it.enabled && it.url.isNotBlank() }
         buildTiles(cameras)
-        b.emptyHint.text = if (cameras.isEmpty()) getString(R.string.no_cameras) else ""
+        if (cameras.isEmpty()) b.lastEvent.text = getString(R.string.no_cameras).replace("\n", " ")
         // Detection runs in the background service; (re)start it – it applies changed settings –
         // and attach this screen to it.
         AnprService.start(this)
@@ -295,49 +297,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     }
 
     override fun onVehicleSaved(entry: VehicleEntry) {
-        // The Room flow will refresh the list; flash the plate to draw attention.
-        b.plateBox.animate().cancel()
-        b.plateBox.scaleX = 1.12f; b.plateBox.scaleY = 1.12f
-        b.plateBox.animate().scaleX(1f).scaleY(1f).setDuration(600).start()
-    }
-
-    private fun showLatest(e: VehicleEntry?) {
-        latest = e
-        if (e == null) {
-            shownLatestId = -1
-            b.monthlyTag.visibility = View.GONE
-            b.tokenInput.setText(""); b.nameInput.setText("")
-            b.latestPlate.text = "— — —"
-            b.latestDate.text = getString(R.string.waiting)
-            b.latestTime.text = ""
-            b.latestConfidence.text = ""
-            b.latestCameras.text = ""
-            b.latestSnapshot.setImageDrawable(null)
-            return
-        }
-        // monthly users in a different colour
-        b.monthlyTag.visibility = if (e.isMonthly) View.VISIBLE else View.GONE
-        b.latestPlate.setTextColor(ContextCompat.getColor(this, if (e.isMonthly) R.color.monthly else R.color.plate_text))
-        if (e.id == shownLatestId) return
-        shownLatestId = e.id
-        // new check-in: token is entered fresh every day, name comes from history / monthly list
-        b.tokenInput.setText(e.token ?: "")
-        b.nameInput.setText(e.name ?: "")
-        b.latestPlate.text = e.plateFormatted
-        b.latestDate.text = dateFmt.format(Date(e.entryTime))
-        b.latestTime.text = timeFmt.format(Date(e.entryTime))
-        b.latestConfidence.text = "Confidence ${(e.confidence * 100).toInt()}%  •  " +
-            "${e.totalReads} reads from ${e.cameraCount} camera${if (e.cameraCount == 1) "" else "s"}"
-        b.latestCameras.text = formatCameraSummary(e.cameraSummary)
-        b.emptyHint.text = ""
-
-        val path = e.snapshotPath
-        if (path == null) {
-            b.latestSnapshot.setImageDrawable(null)
-        } else lifecycleScope.launch {
-            val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
-            if (shownLatestId == e.id) b.latestSnapshot.setImageBitmap(bmp)
-        }
+        b.lastEvent.text = "Checked in: ${entry.plateFormatted} at ${timeFmt.format(Date(entry.entryTime))}" +
+            if (entry.isMonthly) " (monthly user)" else ""
+        b.parkedList.scrollToPosition(0)
     }
 
     // ------------------------------------------------------------------ parking actions
@@ -345,18 +307,6 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private fun hideKeyboard() {
         (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
             .hideSoftInputFromWindow(b.root.windowToken, 0)
-    }
-
-    /** Token / name for the latest check-in. */
-    private fun saveLatestDetails() {
-        val e = latest ?: return
-        val token = b.tokenInput.text.toString()
-        val name = b.nameInput.text.toString()
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { app.parking.saveDetails(e, token, name) }
-            hideKeyboard()
-            android.widget.Toast.makeText(this@MainActivity, "Saved for ${e.plateFormatted}", android.widget.Toast.LENGTH_SHORT).show()
-        }
     }
 
     /** Tap a parked vehicle: edit token/name, or check it out by hand. */
@@ -369,17 +319,24 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             if (e.isMonthly) " · MONTHLY user" else " · due now ₹$due"
         d.token.setText(e.token ?: "")
         d.name.setText(e.name ?: "")
+        d.model.setText(e.model ?: "")
+        e.snapshotPath?.let { path ->
+            lifecycleScope.launch {
+                val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
+                if (bmp != null) { d.photo.setImageBitmap(bmp); d.photo.visibility = View.VISIBLE }
+            }
+        }
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle(e.plateFormatted)
             .setView(d.root)
             .setPositiveButton("Save") { _, _ ->
-                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString()) } }
+                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString(), d.model.text.toString()) } }
             }
             .setNeutralButton(if (e.isMonthly) "Check out" else "Check out ₹$due") { _, _ ->
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
-                        app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString())
-                        app.parking.checkOut(e.copy(token = d.token.text.toString().trim(), name = d.name.text.toString().trim()), settings)
+                        app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString(), d.model.text.toString())
+                        app.parking.checkOut(app.db.entries().get(e.id) ?: e, settings)
                     }
                 }
             }

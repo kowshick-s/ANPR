@@ -69,7 +69,9 @@ data class AppSettings(
     val feeAmount: Int = 10,
     val feePeriodHours: Int = 24,
     /** A parked vehicle seen again sooner than this is still at the gate, not leaving. */
-    val minStayMinutes: Int = 10
+    val minStayMinutes: Int = 10,
+    /** AI plate detector + AI plate reader (on device). Off = classic plate finder only. */
+    val useAiPlates: Boolean = true
 )
 
 class SettingsStore(context: Context) {
@@ -108,7 +110,8 @@ class SettingsStore(context: Context) {
             movingOnly = prefs.getBoolean("movingOnly", d.movingOnly),
             feeAmount = prefs.getInt("feeAmount", d.feeAmount),
             feePeriodHours = prefs.getInt("feePeriodHours", d.feePeriodHours),
-            minStayMinutes = prefs.getInt("minStayMinutes", d.minStayMinutes)
+            minStayMinutes = prefs.getInt("minStayMinutes", d.minStayMinutes),
+            useAiPlates = prefs.getBoolean("useAiPlates", d.useAiPlates)
         )
     }
 
@@ -129,6 +132,7 @@ class SettingsStore(context: Context) {
             .putInt("feeAmount", s.feeAmount)
             .putInt("feePeriodHours", s.feePeriodHours)
             .putInt("minStayMinutes", s.minStayMinutes)
+            .putBoolean("useAiPlates", s.useAiPlates)
             .apply()
     }
 
@@ -144,7 +148,7 @@ class SettingsStore(context: Context) {
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
             .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
             .put("feeAmount", st.feeAmount).put("feePeriodHours", st.feePeriodHours)
-            .put("minStayMinutes", st.minStayMinutes)
+            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -173,7 +177,8 @@ class SettingsStore(context: Context) {
                 movingOnly = j.optBoolean("movingOnly", d.movingOnly),
                 feeAmount = j.optInt("feeAmount", d.feeAmount),
                 feePeriodHours = j.optInt("feePeriodHours", d.feePeriodHours),
-                minStayMinutes = j.optInt("minStayMinutes", d.minStayMinutes)
+                minStayMinutes = j.optInt("minStayMinutes", d.minStayMinutes),
+                useAiPlates = j.optBoolean("useAiPlates", d.useAiPlates)
             ))
         }
         return cams.size

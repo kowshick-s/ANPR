@@ -74,14 +74,16 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 
 ## Parking: check-in, check-out, fees, monthly users
 
-* **Check-in:** a vehicle seen for the first time is checked in (LATEST CHECK-IN card + PARKED NOW list). Enter **Token** and **Name** and press **Save**. The name is filled in automatically from the vehicle's previous visits (or the monthly list); the token is always entered fresh.
+* **Dashboard:** **CHECK-IN** list on the left (green), **CHECK-OUT** list on the right (red). Columns: Vehicle No. · Token · Name · Model · Date & Time.
+* **Check-in:** a vehicle seen for the first time appears at the top of the CHECK-IN list. Type **Token**, **Name** and **Model** straight into the row (no tapping a dialog); each field is saved when you move to the next field or press Enter/OK. Name and Model are filled in automatically from the vehicle's previous visits (or the monthly list); the token is always entered fresh.
+* **Vehicle details (make/owner):** not fetched online. Free public RC lookup does not exist, paid Vahan RC APIs need a business agreement, and owner data is personal data. Enter the model once – it is remembered for the next visit.
 * **Same vehicle again within the minimum stay** (default 10 min) = still at the gate, ignored.
 * **Seen again after that = leaving.**
   * Daily vehicles go to **CHECK-OUT** with the amount due. Collect the money, press **Check out ₹…**, then confirm. **✕** = not actually leaving (returns it to Parked).
   * **Monthly users** are checked out automatically (₹0).
 * **Fee:** ₹10 for every started 24 h by default (2 h = ₹10, 25 h = ₹20). Change the amount and period in *Settings → Parking*.
 * **Monthly users:** *Settings → Parking → Monthly users* holds the master list: vehicle number, name, phone and an optional valid-till date. Their vehicles show in **purple** with a MONTHLY tag.
-* **Parked list:** tap a vehicle to edit its token/name or check it out by hand. Long-press to delete a wrong read.
+* **Check-in list:** tap the vehicle number to see the photo, edit its token/name or check it out by hand. Long-press to delete a wrong read.
 * The header shows **In today** and **Out today · ₹ collected**. *Export history (CSV)* includes token, name, in/out times, status and amount. *Backup settings* also saves the monthly users list.
 
 ## 4. Background scanning
@@ -95,14 +97,9 @@ Detection runs in a background service, not in the dashboard screen. It keeps sc
 
 ## 5. What the TV shows
 
-* **Latest entry** – plate rendered as a number plate, entry **date** and **time** (the moment the first camera saw the vehicle), snapshot with the plate boxed, confidence, and a per-camera comparison:
-  ```
-  ✔ Gate Cam 1      TN 09 AB 1234    92%  ×3
-  ✔ Gate Cam 2      TN 09 AB 1234    71%  ×2
-  ✘ Gate Cam 3      TN 09 AB 7234    60%  ×1
-  ```
-* **Recent entries** – last 50 vehicles with date and time.
-* **Today: N** counter and a live clock.
+* **CHECK-IN** (green, left) and **CHECK-OUT** (red, right) lists – see *Parking* above.
+* A line under the lists with the last event (checked in / leaving / auto checked out).
+* **In today** and **Out today · ₹** counters and a live clock.
 * Optional beep on every new entry.
 
 History is kept in an on-device database (default 30 days, configurable). *Settings → Export history (CSV)* writes a CSV to the box's **Downloads** folder.
@@ -111,9 +108,10 @@ History is kept in an on-device database (default 30 days, configurable). *Setti
 
 **Plate-first reading (per frame)**
 1. Motion in the search area triggers a frame grab at full camera resolution.
-2. **Locate plates** (`PlateLocator`): bright plate-shaped regions that contain dark character blobs, plus aligned groups of characters (single- and two-line plates). The tilt of each plate is measured.
+2. **Locate plates** – **AI plate detector** (YOLOv9-tiny, on device, ONNX). If the area is large and nothing is found, it looks again in 2×2 zoomed tiles. If the AI finds nothing (or is switched off in Settings), the classic finder `PlateLocator` is used: bright plate-shaped regions that contain dark character blobs, plus aligned groups of characters (single- and two-line plates). The tilt of each plate is measured.
 3. **Prepare each plate**: crop with margin → straighten by the measured tilt → enlarge so the plate is ~420 px wide → high-contrast grayscale + sharpening. Tilted plates are also read un-rotated.
-4. **OCR** each prepared crop (ML Kit). Every 3rd cycle, if nothing was readable, the whole area plus 2×2 zoomed tiles are read as a fallback.
+4. **Read** each plate twice, independently: ML Kit OCR on the prepared crop, and the **AI plate reader** (fast-plate-ocr) on the raw crop. Both reads go into the vote. *Settings → Use AI plate detector* turns the AI off for comparison. Models: `assets/models`, MIT licence (see `NOTICE.txt`).
+5. **OCR** fallback: ML Kit. Every 3rd cycle, if nothing was readable, the whole area plus 2×2 zoomed tiles are read as a fallback.
 
 **Set the search area – the most important setting.** In ▶ Preview press **✏ Set search area** and drag a box around where plates pass (TV remote: arrows move, OK switches to resize, BACK to save). It is saved to the camera and kept after closing/restarting the app until you change it. A smaller area = fewer false reads and faster processing. **⛶ Zoom to area** enlarges the picture on screen so you can check it. **🔍 Read plate now** shows the regions found (yellow), the plates read (green) and a strip with each enlarged crop the OCR saw.
 

@@ -49,6 +49,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { viewBinding = true }
     lint { abortOnError = false }
+    androidResources { noCompress += "onnx" }
 }
 
 dependencies {
@@ -65,6 +66,9 @@ dependencies {
     // RTSP playback: LibVLC, the engine inside the VLC app (handles NVRs that omit "fmtp" in SDP,
     // passwords with special characters, H.265, large 4K/5MP frames …)
     implementation("org.videolan.android:libvlc-all:3.6.5")
+
+    // AI plate detector + plate reader (ONNX models in assets/models, MIT – see NOTICE.txt)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 
     // On-device OCR, bundled model -> works on TV boxes without Google Play Services
     implementation("com.google.mlkit:text-recognition:16.0.1")

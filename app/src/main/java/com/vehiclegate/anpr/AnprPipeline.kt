@@ -69,7 +69,7 @@ class AnprPipeline(
         com.vehiclegate.anpr.core.IndianPlateParser.preferredStates =
             com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(settings.commonStates)
         com.vehiclegate.anpr.core.IndianPlateParser.strict = settings.strictStates
-        val rec = PlateRecognizer().also { recognizer = it }
+        val rec = PlateRecognizer(app, settings.useAiPlates).also { recognizer = it }
 
         engine = PlateFusionEngine(
             FusionParams(

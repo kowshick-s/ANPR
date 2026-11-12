@@ -1,0 +1,17 @@
+plate_detector.onnx = yolo-v9-t-640-license-plate-end2end from open-image-models
+  https://github.com/ankandrew/open-image-models  (MIT License, Copyright (c) 2024 ankandrew)
+  sha256 c3c1026ca7d0585dd88084d68182dd897113712fa734ae1557ca70174440c076
+
+plate_ocr.onnx = cct-s-v2-global-model from fast-plate-ocr
+  https://github.com/ankandrew/fast-plate-ocr  (MIT License, Copyright (c) 2024 ankandrew)
+  sha256 384bbbd2cea3ef54761d3df70822ef3a349ee1a112aeafddbe0e3ba06bc6e47b
+  input: 64x128 RGB uint8 (NHWC); output "plate": 10 slots x 37 classes
+  alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_  ('_' = padding)
+
+MIT License: Permission is hereby granted, free of charge, to any person obtaining a copy of this
+software and associated documentation files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions: The above copyright notice and
+this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

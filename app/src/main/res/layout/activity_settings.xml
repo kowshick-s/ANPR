@@ -142,6 +142,16 @@
             <EditText android:id="@+id/commonStates" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapCharacters" />
 
             <CheckBox
+                android:id="@+id/useAiPlates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/row_bg"
+                android:padding="6dp"
+                android:text="Use AI plate detector + AI plate reader (recommended). Off = classic plate finder only – for comparing"
+                android:textColor="@color/text" />
+
+            <CheckBox
                 android:id="@+id/strictStates"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

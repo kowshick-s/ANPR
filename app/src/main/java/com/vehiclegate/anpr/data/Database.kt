@@ -59,7 +59,9 @@ data class VehicleEntry(
     /** Customer name (entered by staff, or auto-filled from history / monthly list) */
     val name: String? = null,
     /** Vehicle is in the monthly users list */
-    val monthly: Boolean? = false
+    val monthly: Boolean? = false,
+    /** Vehicle make/model typed by staff, e.g. "Activa 6G" (added in DB version 3) */
+    val model: String? = null
 ) {
     val isMonthly get() = monthly == true
     val state get() = status ?: EntryStatus.OUT
@@ -101,6 +103,9 @@ interface VehicleEntryDao {
 
     @Query("SELECT name FROM vehicle_entries WHERE plate = :plate AND name IS NOT NULL AND name != '' ORDER BY entryTime DESC LIMIT 1")
     suspend fun lastNameFor(plate: String): String?
+
+    @Query("SELECT model FROM vehicle_entries WHERE plate = :plate AND model IS NOT NULL AND model != '' ORDER BY entryTime DESC LIMIT 1")
+    suspend fun lastModelFor(plate: String): String?
 
     @Query("SELECT * FROM vehicle_entries WHERE id = :id")
     suspend fun get(id: Long): VehicleEntry?
@@ -151,7 +156,7 @@ interface MonthlyMemberDao {
     suspend fun delete(plate: String)
 }
 
-@Database(entities = [VehicleEntry::class, MonthlyMember::class], version = 2, exportSchema = false)
+@Database(entities = [VehicleEntry::class, MonthlyMember::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun entries(): VehicleEntryDao
     abstract fun members(): MonthlyMemberDao
@@ -174,9 +179,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3: vehicle model column. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vehicle_entries ADD COLUMN model TEXT")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "vehicle_gate.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
     }

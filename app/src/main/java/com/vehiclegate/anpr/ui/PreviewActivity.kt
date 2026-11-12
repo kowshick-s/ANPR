@@ -94,7 +94,7 @@ class PreviewActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        recognizer = PlateRecognizer()
+        recognizer = PlateRecognizer(this, (application as com.vehiclegate.anpr.AnprApp).settingsStore.settings().useAiPlates)
         connect()
         handler.post(statsTick)
     }

@@ -341,6 +341,7 @@ class SettingsActivity : AppCompatActivity() {
         b.feePeriodHours.setText(s.feePeriodHours.toString())
         b.minStayMinutes.setText(s.minStayMinutes.toString())
         b.strictStates.isChecked = s.strictStates
+        b.useAiPlates.isChecked = s.useAiPlates
         b.movingOnly.isChecked = s.movingOnly
         b.cooldown.setText(s.cooldownSec.toString())
         b.minReads.setText(s.minReads.toString())
@@ -368,6 +369,7 @@ class SettingsActivity : AppCompatActivity() {
                 commonStates = com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(b.commonStates.text.toString())
                     .joinToString(",").ifEmpty { d.commonStates },
                 strictStates = b.strictStates.isChecked,
+                useAiPlates = b.useAiPlates.isChecked,
                 feeAmount = b.feeAmount.int(d.feeAmount).coerceIn(0, 100_000),
                 feePeriodHours = b.feePeriodHours.int(d.feePeriodHours).coerceIn(1, 24 * 31),
                 minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(1, 24 * 60),

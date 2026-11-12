@@ -21,7 +21,12 @@ import kotlin.math.min
  *  - two-line plates (top "TN 09", bottom "AB 1234") by pairing vertically stacked lines
  *  - the "IND" strip on HSRP plates
  */
-class PlateRecognizer {
+class PlateRecognizer(
+    /** Needed to load the AI plate models from the app's assets. */
+    private val context: android.content.Context? = null,
+    /** Use the AI plate detector + AI plate reader (otherwise the classic plate finder only). */
+    private val useAi: Boolean = false
+) {
 
     data class Candidate(
         val plate: ParsedPlate,
@@ -130,7 +135,37 @@ class PlateRecognizer {
         callback: (PlateResult) -> Unit
     ) {
         workExecutor.execute {
-            val regions: List<Pair<Rect, Float>> = try { locate(bitmap) } catch (e: Exception) { emptyList() }
+            val ai = if (useAi && context != null) PlateAi.get(context) else null
+            var aiFound = false
+            val regions: List<Pair<Rect, Float>> = try {
+                val fromAi = ai?.let { aiRegions(it, bitmap) } ?: emptyList()
+                if (fromAi.isNotEmpty()) { aiFound = true; fromAi } else locate(bitmap)
+            } catch (e: Exception) { emptyList() }
+            val found = HashMap<String, Candidate>()
+            val debug = ArrayList<DebugCrop>()
+
+            // AI plate reader: a second, independent read of every plate region (votes with ML Kit).
+            if (ai != null) for ((r, _) in regions.take(MAX_PLATE_CANDIDATES)) {
+                try {
+                    val pad = Rect(r).apply { inset(-(r.width() * 0.05f).toInt(), -(r.height() * 0.08f).toInt()) }
+                    if (!pad.intersect(0, 0, bitmap.width, bitmap.height)) continue
+                    val crop = Bitmap.createBitmap(bitmap, pad.left, pad.top, pad.width(), pad.height())
+                    val read = ai.read(crop)
+                    val parsed = read?.let { IndianPlateParser.parse(it.first) }
+                    if (keepDebug) {
+                        val thumbH = 120
+                        val tw = (crop.width * thumbH / crop.height.coerceAtLeast(1)).coerceIn(1, 480)
+                        debug += DebugCrop(r, Bitmap.createScaledBitmap(crop, tw, thumbH, true), "AI: ${read?.first ?: "-"}", parsed?.formatted)
+                    }
+                    if (crop !== bitmap) crop.recycle()
+                    if (read != null && parsed != null) {
+                        val c = Candidate(parsed, (read.second * AI_READ_WEIGHT).coerceIn(0f, 1f), Rect(r))
+                        val prev = found[parsed.compact]
+                        if (prev == null || c.score > prev.score) found[parsed.compact] = c
+                    }
+                } catch (_: Exception) { }
+            }
+
             val jobs = ArrayList<Pair<Rect, Bitmap>>()
             for ((idx, pair) in regions.withIndex()) {
                 val (r, angle) = pair
@@ -140,11 +175,9 @@ class PlateRecognizer {
                     if (abs(angle) > 8f && idx < 2) jobs += r to PlateImage.prepare(bitmap, r, 0f)
                 } catch (_: Exception) { }
             }
-            val found = HashMap<String, Candidate>()
-            val debug = ArrayList<DebugCrop>()
 
             fun finish() {
-                if (found.isEmpty() && tilesFallback) {
+                if (found.isEmpty() && tilesFallback && !aiFound) {
                     val tileRegions = listOf(Rect(0, 0, bitmap.width, bitmap.height)) +
                         tiles(bitmap.width, bitmap.height, 2, 2)
                     recognizeRegions(bitmap, tileRegions) { t ->
@@ -176,6 +209,32 @@ class PlateRecognizer {
                 }
             }
             next(0)
+        }
+    }
+
+    /**
+     * AI plate detector on the whole search area; if it finds nothing and the area is large
+     * (small, distant plates), again on 2×2 zoomed tiles. Returns padded boxes, best first.
+     */
+    private fun aiRegions(ai: PlateAi, bitmap: Bitmap): List<Pair<Rect, Float>> {
+        var dets = ai.detect(bitmap)
+        if (dets.isEmpty() && max(bitmap.width, bitmap.height) > 800) {
+            val all = ArrayList<PlateAi.Detection>()
+            for (t in tiles(bitmap.width, bitmap.height, 2, 2)) {
+                val tile = Bitmap.createBitmap(bitmap, t.left, t.top, t.width(), t.height())
+                ai.detect(tile).forEach { d -> all += PlateAi.Detection(Rect(d.box).apply { offset(t.left, t.top) }, d.score) }
+                tile.recycle()
+            }
+            // drop duplicates from overlapping tiles
+            dets = all.sortedByDescending { it.score }.fold(ArrayList()) { acc, d ->
+                if (acc.none { Rect.intersects(it.box, d.box) }) acc += d
+                acc
+            }
+        }
+        return dets.take(MAX_PLATE_CANDIDATES).map { d ->
+            val r = Rect(d.box).apply { inset(-(d.box.width() * 0.06f).toInt(), -(d.box.height() * 0.1f).toInt()) }
+            r.intersect(0, 0, bitmap.width, bitmap.height)
+            r to 0f
         }
     }
 
@@ -289,6 +348,8 @@ class PlateRecognizer {
         }
 
         private const val MAX_PLATE_CANDIDATES = 4
+        /** AI reader is not trained on Indian plates: its reads count a little less than ML Kit's. */
+        private const val AI_READ_WEIGHT = 0.85f
         /** Locating + preparing crops (CPU work) off the main thread, one frame at a time per app. */
         private val workExecutor = Executors.newSingleThreadExecutor()
 

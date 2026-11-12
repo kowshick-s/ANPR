@@ -17,4 +17,9 @@
 
     <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Name" />
     <EditText android:id="@+id/name" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textPersonName|textCapWords" />
+
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vehicle model" />
+    <EditText android:id="@+id/model" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. Activa 6G" android:inputType="textCapWords" />
+
+    <ImageView android:id="@+id/photo" android:layout_width="match_parent" android:layout_height="160dp" android:layout_marginTop="10dp" android:adjustViewBounds="true" android:contentDescription="snapshot" android:scaleType="fitCenter" android:visibility="gone" />
 </LinearLayout>

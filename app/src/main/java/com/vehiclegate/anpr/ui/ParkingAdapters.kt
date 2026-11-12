@@ -22,47 +22,77 @@ private val dateFmt = SimpleDateFormat("dd MMM", Locale.getDefault())
 fun VehicleEntry.whoText(): String {
     val parts = listOfNotNull(
         token?.takeIf { it.isNotBlank() }?.let { "Token $it" },
-        name?.takeIf { it.isNotBlank() }
+        name?.takeIf { it.isNotBlank() },
+        model?.takeIf { it.isNotBlank() }
     )
     return parts.joinToString(" · ").ifEmpty { "no token / name" }
 }
 
-/** Vehicles currently parked. Tap = edit token/name or check out; long-press = delete wrong read. */
-class ParkedAdapter(
-    private val onClick: (VehicleEntry) -> Unit,
+/**
+ * CHECK-IN list (vehicles parked now). Token / Name / Model are typed directly in the row and
+ * saved when the user presses Done/Next or leaves the box. Uses stable ids + DiffUtil so a row
+ * being typed in stays with its vehicle when new check-ins arrive.
+ */
+class CheckInAdapter(
+    private val onSave: (VehicleEntry, token: String, name: String, model: String) -> Unit,
+    private val onPlateClick: (VehicleEntry) -> Unit,
     private val onLongClick: (VehicleEntry) -> Unit
-) : RecyclerView.Adapter<ParkedAdapter.VH>() {
+) : androidx.recyclerview.widget.ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
-    private var items: List<VehicleEntry> = emptyList()
+    init { setHasStableIds(true) }
 
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
+    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val mark: View = v.findViewById(R.id.mark)
         val plate: TextView = v.findViewById(R.id.plate)
-        val who: TextView = v.findViewById(R.id.who)
-        val date: TextView = v.findViewById(R.id.date)
-        val time: TextView = v.findViewById(R.id.time)
+        val token: android.widget.EditText = v.findViewById(R.id.token)
+        val name: android.widget.EditText = v.findViewById(R.id.name)
+        val model: android.widget.EditText = v.findViewById(R.id.model)
+        val whenText: TextView = v.findViewById(R.id.`when`)
+        var entry: VehicleEntry? = null
+
+        init {
+            val save = {
+                entry?.let { e ->
+                    val t = token.text.toString().trim(); val n = name.text.toString().trim(); val m = model.text.toString().trim()
+                    if (t != (e.token ?: "") || n != (e.name ?: "") || m != (e.model ?: "")) {
+                        entry = e.copy(token = t, name = n, model = m)
+                        onSave(e, t, n, m)
+                    }
+                }
+            }
+            for (f in listOf(token, name, model)) {
+                f.setOnFocusChangeListener { _, has -> if (!has) save() }
+                f.setOnEditorActionListener { _, _, _ -> save(); false }
+            }
+        }
     }
 
-    @SuppressLint("NotifyDataSetChanged")
-    fun submit(list: List<VehicleEntry>) { items = list; notifyDataSetChanged() }
+    override fun getItemId(position: Int) = getItem(position).id
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        VH(LayoutInflater.from(parent.context).inflate(R.layout.item_parked, parent, false))
-
-    override fun getItemCount() = items.size
+        VH(LayoutInflater.from(parent.context).inflate(R.layout.item_checkin, parent, false))
 
     override fun onBindViewHolder(h: VH, position: Int) {
-        val e = items[position]
+        val e = getItem(position)
         val ctx = h.itemView.context
-        val color = ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text)
-        h.mark.setBackgroundColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly else R.color.accent))
-        h.plate.text = e.plateFormatted + if (e.isMonthly) "  · MONTHLY" else ""
-        h.plate.setTextColor(color)
-        h.who.text = e.whoText()
-        h.date.text = dateFmt.format(Date(e.entryTime))
-        h.time.text = timeFmt.format(Date(e.entryTime))
-        h.itemView.setOnClickListener { onClick(e) }
-        h.itemView.setOnLongClickListener { onLongClick(e); true }
+        h.entry = e
+        h.mark.setBackgroundColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly else R.color.checkin))
+        h.plate.text = e.plateFormatted + if (e.isMonthly) "\nMONTHLY" else ""
+        h.plate.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
+        // never overwrite what the user is typing
+        if (!h.token.hasFocus()) h.token.setText(e.token ?: "")
+        if (!h.name.hasFocus()) h.name.setText(e.name ?: "")
+        if (!h.model.hasFocus()) h.model.setText(e.model ?: "")
+        h.whenText.text = "${dateFmt.format(Date(e.entryTime))}\n${timeFmt.format(Date(e.entryTime))}"
+        h.plate.setOnClickListener { onPlateClick(e) }
+        h.plate.setOnLongClickListener { onLongClick(e); true }
+    }
+
+    companion object {
+        private val DIFF = object : androidx.recyclerview.widget.DiffUtil.ItemCallback<VehicleEntry>() {
+            override fun areItemsTheSame(a: VehicleEntry, b: VehicleEntry) = a.id == b.id
+            override fun areContentsTheSame(a: VehicleEntry, b: VehicleEntry) = a == b
+        }
     }
 }
 

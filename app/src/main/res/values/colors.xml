@@ -15,4 +15,6 @@
     <color name="ind_blue">#1A3E9A</color>
     <color name="monthly">#9C6ADE</color>
     <color name="monthly_text">#C9A8FF</color>
+    <color name="checkin">#2ECC71</color>
+    <color name="checkout">#FF5A5F</color>
 </resources>

@@ -67,8 +67,10 @@ class ParkingDesk(private val app: AnprApp) {
             if (recentlyOut != null) return Result.Ignored(recentlyOut.plateFormatted, "just checked out")
         }
 
+        // Name and model come back automatically from earlier visits; the token is entered fresh.
         val name = member?.name?.takeIf { it.isNotBlank() } ?: dao.lastNameFor(detected.plate) ?: ""
-        val entry = detected.copy(status = EntryStatus.IN, name = name, token = "", monthly = member != null)
+        val model = dao.lastModelFor(detected.plate) ?: ""
+        val entry = detected.copy(status = EntryStatus.IN, name = name, token = "", model = model, monthly = member != null)
         return Result.CheckedIn(entry.copy(id = dao.insert(entry)))
     }
 
@@ -85,8 +87,11 @@ class ParkingDesk(private val app: AnprApp) {
     suspend fun cancelExit(e: VehicleEntry) =
         dao.update(e.copy(status = EntryStatus.IN, exitDetectedAt = null, amount = null))
 
-    suspend fun saveDetails(e: VehicleEntry, token: String, name: String) =
-        dao.update(e.copy(token = token.trim(), name = name.trim()))
+    /** Saves token / name / model typed on the dashboard (reads the row fresh so nothing is lost). */
+    suspend fun saveDetails(e: VehicleEntry, token: String, name: String, model: String? = null) {
+        val cur = dao.get(e.id) ?: e
+        dao.update(cur.copy(token = token.trim(), name = name.trim(), model = model?.trim() ?: cur.model))
+    }
 
     /** Amount if the vehicle left now (or when it was seen leaving). */
     fun amountDue(e: VehicleEntry, s: AppSettings): Int =
