@@ -1,10 +1,12 @@
 package com.vehiclegate.anpr
 
+import com.vehiclegate.anpr.core.IndianPlateParser
 import com.vehiclegate.anpr.core.ParkingFee
 import com.vehiclegate.anpr.core.levenshtein
 import com.vehiclegate.anpr.data.AppSettings
 import com.vehiclegate.anpr.data.EntryStatus
 import com.vehiclegate.anpr.data.MonthlyMember
+import com.vehiclegate.anpr.data.PlateFix
 import com.vehiclegate.anpr.data.VehicleEntry
 
 /**
@@ -32,7 +34,10 @@ class ParkingDesk(private val app: AnprApp) {
         app.db.members().all().firstOrNull { same(it.plate, plate) && (it.validTill == null || at <= it.validTill) }
 
     /** [detected] is a new vehicle record from the cameras (status IN, entryTime = first seen). */
-    suspend fun onDetected(detected: VehicleEntry, s: AppSettings): Result {
+    suspend fun onDetected(read: VehicleEntry, s: AppSettings): Result {
+        // A plate staff corrected before is saved as the corrected number.
+        val fix = app.db.fixes().get(read.plate)
+        val detected = if (fix != null) read.copy(plate = fix.correct, plateFormatted = fix.correctFormatted) else read
         val t = detected.entryTime
         val minStayMs = s.minStayMinutes * 60_000L
         val member = monthlyMemberFor(detected.plate, t)
@@ -67,11 +72,52 @@ class ParkingDesk(private val app: AnprApp) {
             if (recentlyOut != null) return Result.Ignored(recentlyOut.plateFormatted, "just checked out")
         }
 
-        // Name and model come back automatically from earlier visits; the token is entered fresh.
-        val name = member?.name?.takeIf { it.isNotBlank() } ?: dao.lastNameFor(detected.plate) ?: ""
-        val model = dao.lastModelFor(detected.plate) ?: ""
-        val entry = detected.copy(status = EntryStatus.IN, name = name, token = "", model = model, monthly = member != null)
+        // Token/Name and model come back automatically from earlier visits.
+        val (name, model) = previousDetails(detected.plate)
+        val entry = detected.copy(
+            status = EntryStatus.IN,
+            name = member?.name?.takeIf { it.isNotBlank() } ?: name,
+            token = "", model = model, monthly = member != null
+        )
         return Result.CheckedIn(entry.copy(id = dao.insert(entry)))
+    }
+
+    /** Last Token/Name and model typed for this plate (or for a plate one character different). */
+    private suspend fun previousDetails(plate: String): Pair<String, String> {
+        var name = dao.lastNameFor(plate)
+        var model = dao.lastModelFor(plate)
+        if (name == null || model == null) {
+            val near = dao.recentWithDetails().filter { same(it.plate, plate) }
+            if (name == null) name = near.firstOrNull { !it.name.isNullOrBlank() }?.name
+            if (model == null) model = near.firstOrNull { !it.model.isNullOrBlank() }?.model
+        }
+        return (name ?: "") to (model ?: "")
+    }
+
+    /**
+     * Staff corrected a wrongly read plate. Saves the new number on this visit and remembers the
+     * correction, so the next time the cameras read the same wrong number it is fixed automatically.
+     * Returns an error message, or null when saved.
+     */
+    suspend fun correctPlate(e: VehicleEntry, typed: String): String? {
+        val clean = typed.uppercase().filter { it.isLetterOrDigit() }
+        if (clean.length < 4) return "Enter the full vehicle number"
+        val parsed = IndianPlateParser.parse(clean)
+        val compact = parsed?.compact ?: clean
+        val formatted = parsed?.formatted ?: clean
+        if (compact == e.plate) return null
+        val cur = dao.get(e.id) ?: e
+        val member = monthlyMemberFor(compact, cur.entryTime)
+        val (name, model) = previousDetails(compact)
+        dao.update(cur.copy(
+            plate = compact, plateFormatted = formatted,
+            name = cur.name?.takeIf { it.isNotBlank() } ?: member?.name?.takeIf { it.isNotBlank() } ?: name,
+            model = cur.model?.takeIf { it.isNotBlank() } ?: model,
+            monthly = member != null || cur.isMonthly
+        ))
+        app.db.fixes().upsert(PlateFix(e.plate, compact, formatted))
+        app.db.fixes().delete(compact) // never "correct" a right number into something else
+        return null
     }
 
     /** Staff confirmed check-out (money collected). Fee counts until the vehicle was seen leaving. */
@@ -88,9 +134,9 @@ class ParkingDesk(private val app: AnprApp) {
         dao.update(e.copy(status = EntryStatus.IN, exitDetectedAt = null, amount = null))
 
     /** Saves token / name / model typed on the dashboard (reads the row fresh so nothing is lost). */
-    suspend fun saveDetails(e: VehicleEntry, token: String, name: String, model: String? = null) {
+    suspend fun saveDetails(e: VehicleEntry, who: String, model: String? = null) {
         val cur = dao.get(e.id) ?: e
-        dao.update(cur.copy(token = token.trim(), name = name.trim(), model = model?.trim() ?: cur.model))
+        dao.update(cur.copy(name = who.trim(), model = model?.trim() ?: cur.model))
     }
 
     /** Amount if the vehicle left now (or when it was seen leaving). */

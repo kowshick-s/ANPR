@@ -18,11 +18,10 @@ import java.util.Locale
 private val timeFmt = SimpleDateFormat("hh:mm a", Locale.getDefault())
 private val dateFmt = SimpleDateFormat("dd MMM", Locale.getDefault())
 
-/** "Token 12 · Ravi" / "Ravi" / "no token" */
+/** "Ravi · Activa" / "12 · Activa" / "no token / name" */
 fun VehicleEntry.whoText(): String {
     val parts = listOfNotNull(
-        token?.takeIf { it.isNotBlank() }?.let { "Token $it" },
-        name?.takeIf { it.isNotBlank() },
+        name?.takeIf { it.isNotBlank() } ?: token?.takeIf { it.isNotBlank() },
         model?.takeIf { it.isNotBlank() }
     )
     return parts.joinToString(" · ").ifEmpty { "no token / name" }
@@ -34,7 +33,9 @@ fun VehicleEntry.whoText(): String {
  * being typed in stays with its vehicle when new check-ins arrive.
  */
 class CheckInAdapter(
-    private val onSave: (VehicleEntry, token: String, name: String, model: String) -> Unit,
+    private val onSave: (VehicleEntry, who: String, model: String) -> Unit,
+    /** Model suggestions (common models + every model typed before). */
+    private val modelSuggestions: () -> android.widget.ArrayAdapter<String>?,
     private val onPlateClick: (VehicleEntry) -> Unit,
     private val onLongClick: (VehicleEntry) -> Unit
 ) : androidx.recyclerview.widget.ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
@@ -44,23 +45,23 @@ class CheckInAdapter(
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val mark: View = v.findViewById(R.id.mark)
         val plate: TextView = v.findViewById(R.id.plate)
-        val token: android.widget.EditText = v.findViewById(R.id.token)
         val name: android.widget.EditText = v.findViewById(R.id.name)
-        val model: android.widget.EditText = v.findViewById(R.id.model)
+        val model: android.widget.AutoCompleteTextView = v.findViewById(R.id.model)
         val whenText: TextView = v.findViewById(R.id.`when`)
         var entry: VehicleEntry? = null
 
         init {
             val save = {
                 entry?.let { e ->
-                    val t = token.text.toString().trim(); val n = name.text.toString().trim(); val m = model.text.toString().trim()
-                    if (t != (e.token ?: "") || n != (e.name ?: "") || m != (e.model ?: "")) {
-                        entry = e.copy(token = t, name = n, model = m)
-                        onSave(e, t, n, m)
+                    val n = name.text.toString().trim(); val m = model.text.toString().trim()
+                    if (n != (e.name ?: "") || m != (e.model ?: "")) {
+                        entry = e.copy(name = n, model = m)
+                        onSave(e, n, m)
                     }
                 }
             }
-            for (f in listOf(token, name, model)) {
+            model.setOnItemClickListener { _, _, _, _ -> save() }
+            for (f in listOf(name, model)) {
                 f.setOnFocusChangeListener { _, has -> if (!has) save() }
                 f.setOnEditorActionListener { _, _, _ -> save(); false }
             }
@@ -80,9 +81,9 @@ class CheckInAdapter(
         h.plate.text = e.plateFormatted + if (e.isMonthly) "\nMONTHLY" else ""
         h.plate.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
         // never overwrite what the user is typing
-        if (!h.token.hasFocus()) h.token.setText(e.token ?: "")
-        if (!h.name.hasFocus()) h.name.setText(e.name ?: "")
-        if (!h.model.hasFocus()) h.model.setText(e.model ?: "")
+        if (!h.name.hasFocus()) h.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
+        if (!h.model.hasFocus()) h.model.setText(e.model ?: "", false)
+        if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
         h.whenText.text = "${dateFmt.format(Date(e.entryTime))}\n${timeFmt.format(Date(e.entryTime))}"
         h.plate.setOnClickListener { onPlateClick(e) }
         h.plate.setOnLongClickListener { onLongClick(e); true }
@@ -99,6 +100,7 @@ class CheckInAdapter(
 /** Daily vehicles seen leaving: collect the amount, then Check out. ✕ = not actually leaving. */
 class LeavingAdapter(
     private val amountFor: (VehicleEntry) -> Int,
+    private val onPlateClick: (VehicleEntry) -> Unit,
     private val onCheckout: (VehicleEntry) -> Unit,
     private val onNotLeaving: (VehicleEntry) -> Unit
 ) : RecyclerView.Adapter<LeavingAdapter.VH>() {
@@ -126,6 +128,7 @@ class LeavingAdapter(
         h.plate.text = e.plateFormatted
         h.details.text = "${e.whoText()} · in ${timeFmt.format(Date(e.entryTime))}" +
             " · out ${timeFmt.format(Date(out))} · ${ParkingFee.duration(e.entryTime, out)}"
+        h.plate.setOnClickListener { onPlateClick(e) }
         h.checkout.text = "Check out ₹${amountFor(e)}"
         h.checkout.setOnClickListener { onCheckout(e) }
         h.notLeaving.setOnClickListener { onNotLeaving(e) }

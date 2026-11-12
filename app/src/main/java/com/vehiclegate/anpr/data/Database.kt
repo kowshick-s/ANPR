@@ -107,6 +107,14 @@ interface VehicleEntryDao {
     @Query("SELECT model FROM vehicle_entries WHERE plate = :plate AND model IS NOT NULL AND model != '' ORDER BY entryTime DESC LIMIT 1")
     suspend fun lastModelFor(plate: String): String?
 
+    /** Recent visits that have a token/name or model typed – for matching a slightly misread plate. */
+    @Query("SELECT * FROM vehicle_entries WHERE (name IS NOT NULL AND name != '') OR (model IS NOT NULL AND model != '') ORDER BY entryTime DESC LIMIT 3000")
+    suspend fun recentWithDetails(): List<VehicleEntry>
+
+    /** Every model typed so far (for the model suggestions). */
+    @Query("SELECT DISTINCT model FROM vehicle_entries WHERE model IS NOT NULL AND model != '' ORDER BY model COLLATE NOCASE")
+    suspend fun knownModels(): List<String>
+
     @Query("SELECT * FROM vehicle_entries WHERE id = :id")
     suspend fun get(id: Long): VehicleEntry?
 
@@ -156,10 +164,34 @@ interface MonthlyMemberDao {
     suspend fun delete(plate: String)
 }
 
-@Database(entities = [VehicleEntry::class, MonthlyMember::class], version = 3, exportSchema = false)
+/**
+ * A plate number staff corrected by hand. When the cameras read [wrong] again, it is saved as
+ * [correct] automatically (the same bike is often misread the same way every day).
+ */
+@Entity(tableName = "plate_fixes")
+data class PlateFix(
+    @PrimaryKey val wrong: String,
+    val correct: String,
+    val correctFormatted: String
+)
+
+@Dao
+interface PlateFixDao {
+    @Query("SELECT * FROM plate_fixes WHERE wrong = :plate")
+    suspend fun get(plate: String): PlateFix?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(f: PlateFix)
+
+    @Query("DELETE FROM plate_fixes WHERE wrong = :plate")
+    suspend fun delete(plate: String)
+}
+
+@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun entries(): VehicleEntryDao
     abstract fun members(): MonthlyMemberDao
+    abstract fun fixes(): PlateFixDao
 
     companion object {
         /** v1 → v2: parking columns + monthly members table. Keeps existing history. */
@@ -186,9 +218,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4: hand-corrected plate numbers. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `plate_fixes` (`wrong` TEXT NOT NULL, `correct` TEXT NOT NULL, " +
+                        "`correctFormatted` TEXT NOT NULL, PRIMARY KEY(`wrong`))"
+                )
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "vehicle_gate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
     }

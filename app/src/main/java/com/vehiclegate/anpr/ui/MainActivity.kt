@@ -42,18 +42,30 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
     private val parkedAdapter = CheckInAdapter(
-        onSave = { e, t, n, m ->
-            lifecycleScope.launch(Dispatchers.IO) { app.parking.saveDetails(e, t, n, m) }
+        onSave = { e, who, m ->
+            lifecycleScope.launch(Dispatchers.IO) { app.parking.saveDetails(e, who, m) }
+            if (m.isNotBlank()) addModelSuggestion(m)
         },
+        modelSuggestions = { modelAdapter },
         onPlateClick = { editParked(it) },
         onLongClick = { confirmDelete(it) }
     )
     private val leavingAdapter = LeavingAdapter(
         amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
+        onPlateClick = { editParked(it) },
         onCheckout = { confirmCheckout(it) },
         onNotLeaving = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.cancelExit(e) } } }
     )
-    private var latest: VehicleEntry? = null
+    /** Model suggestions while typing: common models + every model typed before. */
+    private var modelAdapter: android.widget.ArrayAdapter<String>? = null
+    private val modelNames = java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
+
+    private fun newModelAdapter() =
+        android.widget.ArrayAdapter(this, R.layout.item_suggestion, modelNames.toMutableList())
+
+    private fun addModelSuggestion(m: String) {
+        if (modelNames.add(m.trim())) modelAdapter?.add(m.trim())
+    }
     private val handler = Handler(Looper.getMainLooper())
 
     private class Tile(val root: View, val picture: ImageView, val dot: ImageView,
@@ -95,6 +107,12 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         b.leavingList.layoutManager = LinearLayoutManager(this)
         b.leavingList.adapter = leavingAdapter
         b.leavingList.itemAnimator = null
+        modelNames.addAll(com.vehiclegate.anpr.core.VehicleModels.COMMON)
+        modelAdapter = newModelAdapter()
+        lifecycleScope.launch {
+            val known = withContext(Dispatchers.IO) { app.db.entries().knownModels() }
+            known.forEach { addModelSuggestion(it) }
+        }
         b.settingsButton.setOnClickListener { openSettings() }
         b.exitButton.setOnClickListener { confirmExit() }
         askPermissionsOnce()
@@ -102,7 +120,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         lifecycleScope.launch {
             app.db.entries().parked().collect { list ->
                 parkedAdapter.submitList(list)
-                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · type Token / Name / Model in the row · tap number for more"
+                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · type Token or Name and Model in the row · tap the number to correct it"
             }
         }
         lifecycleScope.launch {
@@ -317,9 +335,10 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         d.info.text = "Checked in ${dateFmt.format(Date(e.entryTime))} ${timeFmt.format(Date(e.entryTime))}" +
             " · parked ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, System.currentTimeMillis())}" +
             if (e.isMonthly) " · MONTHLY user" else " · due now ₹$due"
-        d.token.setText(e.token ?: "")
-        d.name.setText(e.name ?: "")
+        d.plate.setText(e.plateFormatted)
+        d.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
         d.model.setText(e.model ?: "")
+        d.model.setAdapter(newModelAdapter())
         e.snapshotPath?.let { path ->
             lifecycleScope.launch {
                 val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
@@ -329,19 +348,32 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle(e.plateFormatted)
             .setView(d.root)
-            .setPositiveButton("Save") { _, _ ->
-                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString(), d.model.text.toString()) } }
-            }
+            .setPositiveButton("Save") { _, _ -> lifecycleScope.launch { saveDialog(e, d) } }
             .setNeutralButton(if (e.isMonthly) "Check out" else "Check out ₹$due") { _, _ ->
                 lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        app.parking.saveDetails(e, d.token.text.toString(), d.name.text.toString(), d.model.text.toString())
+                    if (saveDialog(e, d)) withContext(Dispatchers.IO) {
                         app.parking.checkOut(app.db.entries().get(e.id) ?: e, settings)
                     }
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    /** Saves the edit dialog: corrected plate number, Token/Name, model. False if the number is invalid. */
+    private suspend fun saveDialog(e: VehicleEntry, d: com.vehiclegate.anpr.databinding.DialogEntryBinding): Boolean {
+        val plate = d.plate.text.toString(); val who = d.name.text.toString(); val model = d.model.text.toString()
+        val err = withContext(Dispatchers.IO) {
+            val error = app.parking.correctPlate(e, plate)
+            app.parking.saveDetails(e, who, model)
+            error
+        }
+        if (model.isNotBlank()) addModelSuggestion(model)
+        if (err != null) {
+            android.widget.Toast.makeText(this, "Number not changed: $err", android.widget.Toast.LENGTH_LONG).show()
+            return false
+        }
+        return true
     }
 
     /** Leaving vehicle: show the amount, staff collects money and confirms. */
