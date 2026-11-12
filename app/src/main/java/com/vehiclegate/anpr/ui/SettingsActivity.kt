@@ -42,6 +42,13 @@ class SettingsActivity : AppCompatActivity() {
 
         b.addCamera.setOnClickListener { editCamera(null) }
         b.addNvr.setOnClickListener { addNvrChannels() }
+        b.addTestVideo.setOnClickListener {
+            try {
+                pickVideo.launch(arrayOf("video/*"))
+            } catch (e: android.content.ActivityNotFoundException) {
+                toast("This device has no file picker – add the test video on a phone/tablet.")
+            }
+        }
         b.save.setOnClickListener { save(); finish() }
         b.clearHistory.setOnClickListener { confirmClear() }
         b.exportCsv.setOnClickListener { exportCsv() }
@@ -54,6 +61,42 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         b.addCamera.requestFocus()
+    }
+
+    /**
+     * Test video: copies the chosen clip into the app and adds it as a camera that plays on a loop,
+     * so detection can be tested anywhere without the real cameras.
+     */
+    private val pickVideo = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        toast("Copying video into the app…")
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    var name = "test_video.mp4"
+                    contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) name = c.getString(0) ?: name
+                    }
+                    val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val dir = File(filesDir, "test_videos").apply { mkdirs() }
+                    val out = File(dir, "${System.currentTimeMillis()}_$safe")
+                    contentResolver.openInputStream(uri)?.use { input -> out.outputStream().use { input.copyTo(it) } }
+                        ?: return@withContext null
+                    name to out
+                } catch (e: Exception) { null }
+            }
+            if (result == null) { toast("Could not read that video"); return@launch }
+            val (name, file) = result
+            cameras += CameraConfig(
+                name = "Test video – ${name.substringBeforeLast('.').take(24)}",
+                url = android.net.Uri.fromFile(file).toString(),
+                useTcp = false
+            )
+            persistCameras()
+            toast("Test video added (${file.length() / (1024 * 1024)} MB). Press ▶ Preview on it, or go back to the dashboard.")
+        }
     }
 
     /** Restore: user picks the backup file (e.g. Downloads/vehicle_gate_settings.json). */
@@ -138,14 +181,21 @@ class SettingsActivity : AppCompatActivity() {
         cameras.forEachIndexed { index, cam ->
             val row = ItemCameraConfigBinding.inflate(LayoutInflater.from(this), b.cameraList, false)
             row.camName.text = (if (cam.enabled) "" else "[disabled] ") + cam.name
-            row.camUrl.text = maskPassword(cam.url)
+            row.camUrl.text = if (com.vehiclegate.anpr.camera.VlcPlayer.isTestVideo(cam.url))
+                "Test video (plays on a loop) · ${File(android.net.Uri.parse(cam.url).path ?: "").length() / (1024 * 1024)} MB"
+            else maskPassword(cam.url)
             row.preview.setOnClickListener { PreviewActivity.start(this, cam) }
             row.test.setOnClickListener { RtspTestDialog.show(this, cam.name, cam.url) }
             row.edit.setOnClickListener { editCamera(index) }
             row.delete.setOnClickListener {
                 MaterialAlertDialogBuilder(this)
                     .setTitle("Delete ${cam.name}?")
-                    .setPositiveButton("Delete") { _, _ -> cameras.removeAt(index); persistCameras() }
+                    .setPositiveButton("Delete") { _, _ ->
+                        if (com.vehiclegate.anpr.camera.VlcPlayer.isTestVideo(cam.url)) {
+                            android.net.Uri.parse(cam.url).path?.let { File(it).delete() }
+                        }
+                        cameras.removeAt(index); persistCameras()
+                    }
                     .setNegativeButton("Cancel", null)
                     .show()
             }
@@ -206,7 +256,8 @@ class SettingsActivity : AppCompatActivity() {
     /** Builds a CameraConfig from the dialog fields, or shows a toast and returns null. */
     private fun readCameraDialog(d: DialogCameraBinding, base: CameraConfig): CameraConfig? {
         val url = d.url.text.toString().trim()
-        if (!url.startsWith("rtsp://", ignoreCase = true) && !url.startsWith("rtsps://", ignoreCase = true)) {
+        if (!url.startsWith("rtsp://", ignoreCase = true) && !url.startsWith("rtsps://", ignoreCase = true) &&
+            !com.vehiclegate.anpr.camera.VlcPlayer.isTestVideo(url)) {
             toast("URL must start with rtsp://"); return null
         }
         val l = d.roiL.int(0).coerceIn(0, 95)

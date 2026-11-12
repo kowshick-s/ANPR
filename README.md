@@ -68,6 +68,10 @@ By default the dashboard shows small status chips instead of live video (*Settin
 
 Live tiles at the bottom of the TV screen show each camera with a status dot (green live / amber connecting / red offline, auto-reconnecting) and the last raw read.
 
+### Test videos (testing without the real cameras)
+
+*Settings → + Add test video* picks a video on the device (e.g. a clip downloaded from Hik-Connect playback or exported from the DVR). It's copied into the app and plays on an endless loop like a live camera, through the same detection, logging and dashboard. Set its search area in ▶ Preview like any camera. Disable or delete it when done, and use *Clear history* to remove test entries.
+
 ## 4. Background scanning
 
 Detection runs in a background service, not in the dashboard screen. It keeps scanning when you press Home, open another app, or the screen turns off. A notification "Vehicle Gate ANPR is running – Scanning N cameras · Last: …" shows while it runs.

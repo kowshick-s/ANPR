@@ -19,6 +19,15 @@ import kotlinx.coroutines.withContext
 object RtspTestDialog {
 
     fun show(activity: AppCompatActivity, name: String, url: String) {
+        if (com.vehiclegate.anpr.camera.VlcPlayer.isTestVideo(url)) {
+            val f = java.io.File(android.net.Uri.parse(url).path ?: "")
+            MaterialAlertDialogBuilder(activity)
+                .setTitle("Test video – $name")
+                .setMessage(if (f.exists()) "Video file is saved in the app (${f.length() / (1024 * 1024)} MB). " +
+                    "No network test is needed – use ▶ Preview to watch it." else "The video file is missing – add it again.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
         val density = activity.resources.displayMetrics.density
         val text = TextView(activity).apply {
             typeface = Typeface.MONOSPACE

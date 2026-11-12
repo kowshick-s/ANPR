@@ -57,17 +57,26 @@ class VlcPlayer private constructor(
         release()
         gotFirstFrame = false
 
-        // Credentials go in as options, not in the URL – no URL-escaping problems at all.
-        val target = try { RtspProbe.parseUrl(rawUrl) } catch (e: Exception) {
-            listener.onError("invalid URL: ${e.message}"); return
+        val media: Media
+        if (isTestVideo(rawUrl)) {
+            // Test video saved on the device: play it on an endless loop, like a live camera.
+            media = Media(libVlc, Uri.parse(rawUrl.trim()))
+            media.setHWDecoderEnabled(true, false)
+            media.addOption(":input-repeat=65535")
+            media.addOption(":no-audio")
+        } else {
+            // Credentials go in as options, not in the URL – no URL-escaping problems at all.
+            val target = try { RtspProbe.parseUrl(rawUrl) } catch (e: Exception) {
+                listener.onError("invalid URL: ${e.message}"); return
+            }
+            media = Media(libVlc, Uri.parse(target.requestUrl))
+            media.setHWDecoderEnabled(true, false)
+            media.addOption(":network-caching=$NETWORK_CACHING_MS")
+            media.addOption(":no-audio")
+            if (useTcp) media.addOption(":rtsp-tcp")
+            target.user?.let { media.addOption(":rtsp-user=$it") }
+            target.password?.let { media.addOption(":rtsp-pwd=$it") }
         }
-        val media = Media(libVlc, Uri.parse(target.requestUrl))
-        media.setHWDecoderEnabled(true, false)
-        media.addOption(":network-caching=$NETWORK_CACHING_MS")
-        media.addOption(":no-audio")
-        if (useTcp) media.addOption(":rtsp-tcp")
-        target.user?.let { media.addOption(":rtsp-user=$it") }
-        target.password?.let { media.addOption(":rtsp-pwd=$it") }
 
         val mp = MediaPlayer(libVlc)
         mp.media = media
@@ -159,6 +168,9 @@ class VlcPlayer private constructor(
     }
 
     companion object {
+        /** A test video file saved in the app (instead of an RTSP camera). */
+        fun isTestVideo(url: String) = url.trim().startsWith("file://", ignoreCase = true)
+
         private const val NETWORK_CACHING_MS = 300
         private const val INITIAL_W = 1920
         private const val INITIAL_H = 1080
