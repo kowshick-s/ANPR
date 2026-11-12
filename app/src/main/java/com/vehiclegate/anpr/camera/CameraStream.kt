@@ -29,6 +29,8 @@ class CameraStream(
     private val ocrIntervalMs: Long,
     /** Send a small picture about once a second for the dashboard tiles. */
     private val thumbnails: Boolean,
+    /** Keep only plates where something moved recently (vehicle being ridden in, not parked). */
+    private val movingOnly: Boolean,
     private val listener: Listener
 ) {
     enum class Status { CONNECTING, LIVE, RECONNECTING, STOPPED }
@@ -184,17 +186,15 @@ class CameraStream(
             src.grab(THUMB_W, THUMB_H)?.let { bmp -> main.post { listener.onThumbnail(config, bmp) } }
         }
 
-        val moving = if (config.motionSensitivity == 0) {
-            true
-        } else {
-            val small = src.grab(MotionDetector.W, MotionDetector.H, smallFrame)
-            smallFrame = small
-            if (small != null && motion.update(small, config)) lastMotionAt = now
-            now - lastMotionAt < MOTION_HOLD_MS
-        }
+        // Motion is always tracked (also needed for the "moving vehicles only" filter).
+        val small = src.grab(MotionDetector.W, MotionDetector.H, smallFrame)
+        smallFrame = small
+        if (small != null && motion.update(small, config, now)) lastMotionAt = now
+        val moving = config.motionSensitivity == 0 || now - lastMotionAt < MOTION_HOLD_MS
 
-        // Fast scans while something moves; slow "idle" scans otherwise, so vehicles that stop
-        // at the gate (or creep in without much motion) are still read.
+        // Fast scans while something moves. Without "moving only", slow idle scans also read
+        // vehicles that stop at the gate; with it, still pictures are not scanned at all.
+        if (!moving && movingOnly) return
         val interval = if (moving) ocrIntervalMs else IDLE_SCAN_MS
         if (ocrBusy || now - lastOcrAt < interval) return
         lastOcrAt = now
@@ -213,8 +213,14 @@ class CameraStream(
         scans++
         val n = scans
         main.post { listener.onScan(config, n, moving) }
+        val grabbedAt = now
+        val cw = crop.width.toFloat()
+        val ch = crop.height.toFloat()
         recognizer.recognizePlates(crop, tilesFallback = useTiles) { result ->
-            val candidates = result.candidates
+            val candidates = if (!movingOnly) result.candidates else result.candidates.filter { c ->
+                // plate must be where something moved in the last few seconds (a parked plate never does)
+                motion.movedNear(c.box.left / cw, c.box.top / ch, c.box.right / cw, c.box.bottom / ch, grabbedAt)
+            }
             ocrBusy = false
             if (candidates.isEmpty()) crop.recycle()
             else listener.onPlates(config, candidates, crop, timestamp)
@@ -235,7 +241,32 @@ class CameraStream(
         private var prev: IntArray? = null
         private var cur: IntArray? = null
 
-        fun update(bmp: Bitmap, cfg: CameraConfig): Boolean {
+        /** When each thumbnail pixel (inside the search area) last changed. */
+        private val lastChange = LongArray(W * H)
+        @Volatile private var rx0 = 0; @Volatile private var ry0 = 0
+        @Volatile private var rx1 = W; @Volatile private var ry1 = H
+
+        /**
+         * True if something moved near this box (0..1 of the search area) within the last few
+         * seconds before [atMs] – i.e. the plate belongs to a moving vehicle.
+         */
+        fun movedNear(l: Float, t: Float, r: Float, b: Float, atMs: Long): Boolean {
+            val w = rx1 - rx0; val h = ry1 - ry0
+            if (w <= 0 || h <= 0) return true
+            val padX = (r - l) * 0.5f; val padY = (b - t) * 1.0f
+            val x0 = (rx0 + ((l - padX) * w).toInt()).coerceIn(rx0, rx1 - 1)
+            val x1 = (rx0 + ((r + padX) * w).toInt()).coerceIn(x0 + 1, rx1)
+            val y0 = (ry0 + ((t - padY) * h).toInt()).coerceIn(ry0, ry1 - 1)
+            val y1 = (ry0 + ((b + padY) * h).toInt()).coerceIn(y0 + 1, ry1)
+            var hits = 0
+            for (y in y0 until y1) for (x in x0 until x1) {
+                val tc = lastChange[y * W + x]
+                if (tc != 0L && atMs - tc in -1_000L..MOVE_WINDOW_MS) hits++
+            }
+            return hits >= 2
+        }
+
+        fun update(bmp: Bitmap, cfg: CameraConfig, now: Long): Boolean {
             bmp.getPixels(pixels, 0, W, 0, 0, W, H)
             val x0 = W * cfg.roiLeft.coerceIn(0, 95) / 100
             val y0 = H * cfg.roiTop.coerceIn(0, 95) / 100
@@ -260,8 +291,10 @@ class CameraStream(
             val rh = y1 - y0
             var changed = 0
             var minX = rw; var minY = rh; var maxX = -1; var maxY = -1
+            rx0 = x0; ry0 = y0; rx1 = x1; ry1 = y1
             for (i in 0 until n) if (abs(c[i] - p[i]) > PIXEL_DIFF) {
                 changed++
+                lastChange[(y0 + i / rw) * W + (x0 + i % rw)] = now
                 val x = i % rw
                 val y = i / rw
                 // ignore isolated noise pixels for the bounding box
@@ -288,6 +321,7 @@ class CameraStream(
             const val W = 128
             const val H = 72
             const val PIXEL_DIFF = 25
+            const val MOVE_WINDOW_MS = 3_000L
         }
     }
 

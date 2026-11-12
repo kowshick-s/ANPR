@@ -64,6 +64,14 @@ object IndianPlateParser {
     @Volatile
     var preferredStates: Set<String> = parseStateList(DEFAULT_PREFERRED)
 
+    /**
+     * Strict mode (the app's default): only plates from [preferredStates] are accepted, and the
+     * plate must have the full modern format – 2-digit district and 4-digit number. Misreads like
+     * "CH 8 A 06" or "BR 9 046" are rejected instead of being logged.
+     */
+    @Volatile
+    var strict: Boolean = false
+
     fun parseStateList(text: String): Set<String> =
         text.uppercase().split(',', ' ', ';', '/').map { it.trim() }.filter { it in STATE_CODES }.toSet()
 
@@ -106,6 +114,10 @@ object IndianPlateParser {
         var cost = 0
         val (state, stateCost) = fixState(s[0], s[1]) ?: return null
         cost += stateCost
+        if (strict) {
+            if (preferredStates.isNotEmpty() && state !in preferredStates) return null
+            if (districtLen != 2 || numberLen != 4) return null
+        }
 
         var i = 2
         val district = StringBuilder()

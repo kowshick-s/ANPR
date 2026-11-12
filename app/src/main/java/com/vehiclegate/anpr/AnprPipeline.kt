@@ -62,6 +62,7 @@ class AnprPipeline(
         running = true
         com.vehiclegate.anpr.core.IndianPlateParser.preferredStates =
             com.vehiclegate.anpr.core.IndianPlateParser.parseStateList(settings.commonStates)
+        com.vehiclegate.anpr.core.IndianPlateParser.strict = settings.strictStates
         val rec = PlateRecognizer().also { recognizer = it }
 
         engine = PlateFusionEngine(
@@ -110,7 +111,8 @@ class AnprPipeline(
         }
 
         for (cfg in cameras) {
-            val s = CameraStream(app, cfg, rec, settings.ocrIntervalMs.toLong(), settings.showLiveVideo, listener)
+            val s = CameraStream(app, cfg, rec, settings.ocrIntervalMs.toLong(), settings.showLiveVideo,
+                settings.movingOnly, listener)
             streams += s
             s.start()
         }

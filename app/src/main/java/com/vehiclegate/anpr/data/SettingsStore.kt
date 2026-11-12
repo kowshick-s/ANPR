@@ -60,7 +60,11 @@ data class AppSettings(
     val showLiveVideo: Boolean = false,
     val siteTitle: String = "Vehicle Entry Monitor",
     /** State codes most vehicles at this site come from – preferred when correcting OCR errors. */
-    val commonStates: String = com.vehiclegate.anpr.core.IndianPlateParser.DEFAULT_PREFERRED
+    val commonStates: String = com.vehiclegate.anpr.core.IndianPlateParser.DEFAULT_PREFERRED,
+    /** Reject plates whose state is not in [commonStates], and require the full plate format. */
+    val strictStates: Boolean = true,
+    /** Log only plates that were moving (vehicle being ridden/driven), ignore parked vehicles. */
+    val movingOnly: Boolean = true
 )
 
 class SettingsStore(context: Context) {
@@ -94,7 +98,9 @@ class SettingsStore(context: Context) {
             retentionDays = prefs.getInt("retentionDays", d.retentionDays),
             showLiveVideo = prefs.getBoolean("showLiveVideo", d.showLiveVideo),
             siteTitle = prefs.getString("siteTitle", d.siteTitle) ?: d.siteTitle,
-            commonStates = prefs.getString("commonStates", d.commonStates) ?: d.commonStates
+            commonStates = prefs.getString("commonStates", d.commonStates) ?: d.commonStates,
+            strictStates = prefs.getBoolean("strictStates", d.strictStates),
+            movingOnly = prefs.getBoolean("movingOnly", d.movingOnly)
         )
     }
 
@@ -110,6 +116,8 @@ class SettingsStore(context: Context) {
             .putBoolean("showLiveVideo", s.showLiveVideo)
             .putString("siteTitle", s.siteTitle)
             .putString("commonStates", s.commonStates)
+            .putBoolean("strictStates", s.strictStates)
+            .putBoolean("movingOnly", s.movingOnly)
             .apply()
     }
 
@@ -123,6 +131,7 @@ class SettingsStore(context: Context) {
             .put("minConfidencePct", st.minConfidencePct).put("beepOnEntry", st.beepOnEntry)
             .put("retentionDays", st.retentionDays).put("showLiveVideo", st.showLiveVideo)
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
+            .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -146,7 +155,9 @@ class SettingsStore(context: Context) {
                 retentionDays = j.optInt("retentionDays", d.retentionDays),
                 showLiveVideo = j.optBoolean("showLiveVideo", d.showLiveVideo),
                 siteTitle = j.optString("siteTitle", d.siteTitle),
-                commonStates = j.optString("commonStates", d.commonStates)
+                commonStates = j.optString("commonStates", d.commonStates),
+                strictStates = j.optBoolean("strictStates", d.strictStates),
+                movingOnly = j.optBoolean("movingOnly", d.movingOnly)
             ))
         }
         return cams.size

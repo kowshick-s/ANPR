@@ -133,4 +133,19 @@ class AnprCoreTest {
         assertEquals("KL07AB1234", p("KL07AB1234")?.compact)
         assertTrue(p("MH12AB1234")!!.formatScore < p("TN12AB1234")!!.formatScore) // other states still valid, lower trust
     }
+
+    @Test fun strictModeRejectsOtherStatesAndShortNumbers() {
+        IndianPlateParser.strict = true
+        try {
+            assertNull(p("CH8A06"))        // not a site state, 1-digit district, 2-digit number
+            assertNull(p("BR9046"))
+            assertNull(p("MH12AB1234"))    // valid plate but not a site state
+            assertNull(p("TN09XY12"))      // 2-digit number
+            assertEquals("TN22DV1297", p("TN22DV1297")?.compact)
+            assertEquals("TN09AB0313", p("TN09AB0313")?.compact)
+            assertEquals("KA01A1234", p("KA01A1234")?.compact)
+        } finally {
+            IndianPlateParser.strict = false
+        }
+    }
 }
