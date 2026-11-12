@@ -89,6 +89,18 @@
         android:textColor="@color/checkin"
         android:textSize="12sp" />
 
+    <TextView
+        android:id="@+id/photo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="2dp"
+        android:background="@drawable/focus_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="6dp"
+        android:text="📷"
+        android:textSize="18sp" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/out"
         style="@style/TvButton"

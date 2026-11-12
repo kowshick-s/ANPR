@@ -48,12 +48,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         },
         modelSuggestions = { modelAdapter },
         onPlateEdit = { e, p -> correctPlate(e, p) },
+        onPhoto = { showPhoto(it) },
         onOut = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.markLeaving(e, app.settingsStore.settings()) } } },
         onLongClick = { confirmDelete(it) }
     )
     private val leavingAdapter = LeavingAdapter(
         amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
         onPlateEdit = { e, p -> correctPlate(e, p) },
+        onPhoto = { showPhoto(it) },
         onCheckout = { confirmCheckout(it) },
         onNotLeaving = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.cancelExit(e) } } }
     )
@@ -388,6 +390,35 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    /** Captured picture of the vehicle (plate boxed), large. Tap anywhere to close. */
+    private fun showPhoto(e: VehicleEntry) {
+        val path = e.snapshotPath
+        if (path == null) { b.lastEvent.text = "No picture saved for ${e.plateFormatted}"; return }
+        lifecycleScope.launch {
+            val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
+            if (bmp == null) { b.lastEvent.text = "Picture of ${e.plateFormatted} is no longer stored"; return@launch }
+            val dlg = android.app.Dialog(this@MainActivity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            val box = android.widget.LinearLayout(this@MainActivity).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setBackgroundColor(0xFF000000.toInt())
+                setPadding(16, 16, 16, 16)
+            }
+            box.addView(TextView(this@MainActivity).apply {
+                text = "${e.plateFormatted}   ·   ${dateFmt.format(Date(e.entryTime))}  ${timeFmt.format(Date(e.entryTime))}" +
+                    "   ·   ${e.whoText()}      (tap to close)"
+                setTextColor(0xFFFFFFFF.toInt()); textSize = 18f; setPadding(8, 4, 8, 12)
+            })
+            box.addView(ImageView(this@MainActivity).apply {
+                setImageBitmap(bmp); scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = android.widget.LinearLayout.LayoutParams(-1, 0, 1f)
+            })
+            box.setOnClickListener { dlg.dismiss() }
+            box.isFocusable = true
+            dlg.setContentView(box)
+            dlg.show()
+        }
     }
 
     /** Plate corrected in a row. */
