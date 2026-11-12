@@ -141,6 +141,8 @@ class AnprCoreTest {
             assertNull(p("BR9046"))
             assertNull(p("MH12AB1234"))    // valid plate but not a site state
             assertNull(p("TN09XY12"))      // 2-digit number
+            assertNull(p("TN010021"))      // no series letters
+            assertEquals("TN01AB0021", p("TN01AB0021")?.compact)
             assertEquals("TN22DV1297", p("TN22DV1297")?.compact)
             assertEquals("TN09AB0313", p("TN09AB0313")?.compact)
             assertEquals("KA01A1234", p("KA01A1234")?.compact)

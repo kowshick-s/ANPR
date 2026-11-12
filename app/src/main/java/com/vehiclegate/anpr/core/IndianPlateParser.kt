@@ -66,7 +66,8 @@ object IndianPlateParser {
 
     /**
      * Strict mode (the app's default): only plates from [preferredStates] are accepted, and the
-     * plate must have the full modern format – 2-digit district and 4-digit number. Misreads like
+     * plate must have the full modern format – 2-digit district, 1–3 series letters (no I/O) and
+     * a 4-digit number, e.g. TN 01 AB 0021. Misreads like
      * "CH 8 A 06" or "BR 9 046" are rejected instead of being logged.
      */
     @Volatile
@@ -117,6 +118,8 @@ object IndianPlateParser {
         if (strict) {
             if (preferredStates.isNotEmpty() && state !in preferredStates) return null
             if (districtLen != 2 || numberLen != 4) return null
+            // every current plate has a 1–3 letter series between district and number
+            if (seriesLen == 0) return null
         }
 
         var i = 2
@@ -129,6 +132,8 @@ object IndianPlateParser {
 
         if (district.all { it == '0' }) return null
         if (number.all { it == '0' }) return null
+        // "I" and "O" are never issued in series letters (too close to 1 and 0)
+        if (strict && series.any { it == 'I' || it == 'O' }) return null
 
         var score = 1f - 0.1f * cost
         // States rarely seen at this site are trusted a little less.
