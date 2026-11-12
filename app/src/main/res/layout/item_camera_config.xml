@@ -1,64 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Name + URL on top, buttons in an equal-width row below: fits phones in portrait and TVs. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
-    android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:layout_marginBottom="14dp"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/camName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/camUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="middle"
+        android:singleLine="true"
+        android:textColor="@color/text_dim"
+        android:textSize="12sp" />
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/camName"
-            android:layout_width="wrap_content"
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/preview"
+            style="@style/TvButton"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:textColor="@color/text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/camUrl"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:ellipsize="middle"
+            android:layout_weight="1.3"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
             android:singleLine="true"
-            android:textColor="@color/text_dim"
-            android:textSize="12sp" />
+            android:text="▶ Preview"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/test"
+            style="@style/TvButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:singleLine="true"
+            android:text="Test"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/edit"
+            style="@style/TvButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:singleLine="true"
+            android:text="Edit"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/delete"
+            style="@style/TvButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:singleLine="true"
+            android:text="Delete"
+            android:textColor="@color/error"
+            android:textSize="14sp" />
     </LinearLayout>
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/preview"
-        style="@style/TvButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="▶ Preview" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/test"
-        style="@style/TvButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:text="Test" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/edit"
-        android:layout_marginStart="8dp"
-        style="@style/TvButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Edit" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/delete"
-        style="@style/TvButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:text="Delete"
-        android:textColor="@color/error" />
 </LinearLayout>

@@ -52,33 +52,33 @@
                 android:orientation="vertical" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/addCamera"
                     style="@style/TvButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="+ Add camera" />
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/addNvr"
                     style="@style/TvButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="+ Add NVR channels" />
+                    android:layout_marginTop="8dp"
+                    android:text="+ Add NVR / DVR channels" />
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/addTestVideo"
                     style="@style/TvButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="+ Add test video" />
+                    android:layout_marginTop="8dp"
+                    android:text="+ Add test video (play a saved clip as a camera)" />
             </LinearLayout>
         </LinearLayout>
 
@@ -143,56 +143,52 @@
                 android:textColor="@color/text" />
         </LinearLayout>
 
-        <HorizontalScrollView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:scrollbars="none">
-        <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/save"
+            style="@style/TvButton"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp"
+            android:text="Save &amp; back" />
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/save"
-                style="@style/TvButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Save &amp; back" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/exportSettings"
+            style="@style/TvButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Backup settings" />
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/exportSettings"
-                style="@style/TvButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Backup settings" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/importSettings"
+            style="@style/TvButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Restore settings" />
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/importSettings"
-                style="@style/TvButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Restore settings" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/exportCsv"
+            style="@style/TvButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Export history (CSV)" />
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/exportCsv"
-                style="@style/TvButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Export history (CSV)" />
-
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/clearHistory"
-                style="@style/TvButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:text="Clear history"
-                android:textColor="@color/error" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/clearHistory"
+            style="@style/TvButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Clear history"
+            android:textColor="@color/error" />
         </LinearLayout>
-        </HorizontalScrollView>
     </LinearLayout>
 </ScrollView>
