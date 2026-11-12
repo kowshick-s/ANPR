@@ -323,6 +323,35 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
 
     // ------------------------------------------------------------------ parking actions
 
+    /** Tap outside the box being typed in: save it and close the keyboard. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+            val f = currentFocus
+            if (f is android.widget.EditText) {
+                val r = android.graphics.Rect(); f.getGlobalVisibleRect(r)
+                if (!r.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    val touchedBox = findEditTextAt(b.root, ev.rawX.toInt(), ev.rawY.toInt())
+                    if (touchedBox == null) {
+                        // root takes the focus → the box saves (focus lost) and the keyboard closes
+                        b.root.isFocusableInTouchMode = true
+                        b.root.requestFocus()
+                        hideKeyboard()
+                    }
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun findEditTextAt(v: View, x: Int, y: Int): View? {
+        if (v.visibility != View.VISIBLE) return null
+        val r = android.graphics.Rect()
+        if (!v.getGlobalVisibleRect(r) || !r.contains(x, y)) return null
+        if (v is android.widget.EditText) return v
+        if (v is android.view.ViewGroup) for (i in v.childCount - 1 downTo 0) findEditTextAt(v.getChildAt(i), x, y)?.let { return it }
+        return null
+    }
+
     private fun hideKeyboard() {
         (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
             .hideSoftInputFromWindow(b.root.windowToken, 0)

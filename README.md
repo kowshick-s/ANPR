@@ -80,7 +80,7 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 * **Wrong number read?** Type the correct number over it in the row (check-in or check-out list) and press Enter/OK. The app remembers the correction: when the cameras read the same wrong number again, it is saved as the corrected number automatically.
 * **Vehicle details (make/owner):** not fetched online. Free public RC lookup does not exist, paid Vahan RC APIs need a business agreement, and owner data is personal data. Enter the model once – it is remembered for the next visit.
 * **Rule:** not checked in → **check in** (also right after a check-out – that is a new visit). Checked in → **leaving**.
-* Only exception: a checked-in vehicle seen again within the **minimum stay** (default 2 min, 0 = off) is still at the gate.
+* Typing: tap a box, the keyboard opens and you type in the box itself. It saves by itself a moment after you stop typing (the vehicle number saves when you leave the box or tap outside).
   * Daily vehicles go to **CHECK-OUT** with the amount due. Collect the money, press **Check out ₹…**, then confirm. **✕** = not actually leaving (returns it to Parked).
   * **Monthly users** are checked out automatically (₹0).
 * **Fee:** ₹10 for every started 24 h by default (2 h = ₹10, 25 h = ₹20). Change the amount and period in *Settings → Parking*.

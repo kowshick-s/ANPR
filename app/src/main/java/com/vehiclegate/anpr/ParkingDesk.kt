@@ -12,8 +12,7 @@ import com.vehiclegate.anpr.data.VehicleEntry
 /**
  * Parking rules applied to every detected vehicle:
  *  - not parked yet                    → CHECK-IN (name filled from the monthly list or history)
- *  - parked, seen again within min stay → ignored (still at the gate / lingering)
- *  - parked, seen again after min stay  → leaving: monthly = auto check-out, daily = CHECK-OUT list
+ *  - parked, seen again                 → leaving: monthly = auto check-out, daily = CHECK-OUT list
  *  - not parked (incl. checked out)       → CHECK-IN again
  * Plates are matched allowing one misread character.
  */
@@ -52,9 +51,8 @@ class ParkingDesk(private val app: AnprApp) {
                 // Never checked out at the desk, and now arriving again: close the old visit.
                 dao.update(open.copy(status = EntryStatus.OUT, exitTime = seen))
             } else {
-                if (t - open.entryTime < minStayMs) {
-                    return Result.Ignored(open.plateFormatted, "already checked in at the gate")
-                }
+                // Checked in and seen again = leaving. (The same pass past several cameras was
+                // already merged into one read by the re-entry cooldown.)
                 return if (open.isMonthly || member != null) {
                     val out = open.copy(status = EntryStatus.OUT, exitDetectedAt = t, exitTime = t, amount = 0)
                     dao.update(out)

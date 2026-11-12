@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:background="@drawable/cell_field_bg"
             android:fontFamily="sans-serif-condensed"
-            android:imeOptions="actionDone"
+            android:imeOptions="actionDone|flagNoExtractUi"
             android:inputType="textCapCharacters|textNoSuggestions"
             android:paddingLeft="7dp"
             android:paddingTop="4dp"

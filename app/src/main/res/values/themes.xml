@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.VehicleGate" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- landscape phones: type in the box itself, never in a full-screen editor -->
+        <item name="android:editTextStyle">@style/InlineEditText</item>
+        <item name="android:autoCompleteTextViewStyle">@style/InlineAutoComplete</item>
         <item name="android:windowBackground">@color/bg</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorOnPrimary">#000000</item>
@@ -33,5 +36,11 @@
         <item name="android:textSize">15sp</item>
         <item name="android:padding">10dp</item>
         <item name="android:singleLine">true</item>
+    </style>
+    <style name="InlineEditText" parent="Widget.AppCompat.EditText">
+        <item name="android:imeOptions">flagNoExtractUi</item>
+    </style>
+    <style name="InlineAutoComplete" parent="Widget.AppCompat.AutoCompleteTextView">
+        <item name="android:imeOptions">flagNoExtractUi</item>
     </style>
 </resources>

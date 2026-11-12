@@ -72,6 +72,16 @@ class CheckInAdapter(
             plate.setOnFocusChangeListener { _, has -> if (!has) savePlate() }
             plate.setOnEditorActionListener { _, _, _ -> savePlate(); false }
             model.setOnItemClickListener { _, _, _, _ -> save() }
+            // save 0.8 s after the last key press – no Done / Enter needed
+            val autoSave = Runnable { save() }
+            for (f in listOf(name, model)) f.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    if (!f.hasFocus()) return
+                    f.removeCallbacks(autoSave); f.postDelayed(autoSave, 800)
+                }
+            })
             for (f in listOf(name, model)) {
                 f.setOnFocusChangeListener { _, has -> if (!has) save() }
                 f.setOnEditorActionListener { _, _, _ -> save(); false }
