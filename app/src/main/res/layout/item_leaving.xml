@@ -13,17 +13,20 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <TextView
+        <EditText
             android:id="@+id/plate"
-            android:background="@drawable/row_bg"
-            android:focusable="true"
-            android:clickable="true"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/cell_field_bg"
             android:fontFamily="sans-serif-condensed"
+            android:imeOptions="actionDone"
+            android:inputType="textCapCharacters|textNoSuggestions"
+            android:paddingLeft="7dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:singleLine="true"
             android:textColor="@color/text"
-            android:textSize="19sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <TextView

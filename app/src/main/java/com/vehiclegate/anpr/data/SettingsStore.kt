@@ -69,7 +69,7 @@ data class AppSettings(
     val feeAmount: Int = 10,
     val feePeriodHours: Int = 24,
     /** A parked vehicle seen again sooner than this is still at the gate, not leaving. */
-    val minStayMinutes: Int = 10,
+    val minStayMinutes: Int = 2,
     /** AI plate detector + AI plate reader (on device). Off = classic plate finder only. */
     val useAiPlates: Boolean = true
 )

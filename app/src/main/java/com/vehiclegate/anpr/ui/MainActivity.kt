@@ -47,12 +47,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             if (m.isNotBlank()) addModelSuggestion(m)
         },
         modelSuggestions = { modelAdapter },
-        onPlateClick = { editParked(it) },
+        onPlateEdit = { e, p -> correctPlate(e, p) },
+        onOut = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.markLeaving(e, app.settingsStore.settings()) } } },
         onLongClick = { confirmDelete(it) }
     )
     private val leavingAdapter = LeavingAdapter(
         amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
-        onPlateClick = { editParked(it) },
+        onPlateEdit = { e, p -> correctPlate(e, p) },
         onCheckout = { confirmCheckout(it) },
         onNotLeaving = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.cancelExit(e) } } }
     )
@@ -120,7 +121,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         lifecycleScope.launch {
             app.db.entries().parked().collect { list ->
                 parkedAdapter.submitList(list)
-                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · type Token or Name and Model in the row · tap the number to correct it"
+                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · edit number, Token/Name, Model in the row · Out = leaving"
             }
         }
         lifecycleScope.launch {
@@ -358,6 +359,15 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    /** Plate corrected in a row. */
+    private fun correctPlate(e: VehicleEntry, typed: String) {
+        lifecycleScope.launch {
+            val err = withContext(Dispatchers.IO) { app.parking.correctPlate(e, typed) }
+            b.lastEvent.text = if (err == null) "Number corrected: ${e.plateFormatted} → ${typed.uppercase()} (remembered for next time)"
+                else "Number not changed: $err"
+        }
     }
 
     /** Saves the edit dialog: corrected plate number, Token/Name, model. False if the number is invalid. */

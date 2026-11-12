@@ -36,7 +36,9 @@ class CheckInAdapter(
     private val onSave: (VehicleEntry, who: String, model: String) -> Unit,
     /** Model suggestions (common models + every model typed before). */
     private val modelSuggestions: () -> android.widget.ArrayAdapter<String>?,
-    private val onPlateClick: (VehicleEntry) -> Unit,
+    /** Plate number corrected in the row. */
+    private val onPlateEdit: (VehicleEntry, String) -> Unit,
+    private val onOut: (VehicleEntry) -> Unit,
     private val onLongClick: (VehicleEntry) -> Unit
 ) : androidx.recyclerview.widget.ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
@@ -44,7 +46,8 @@ class CheckInAdapter(
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val mark: View = v.findViewById(R.id.mark)
-        val plate: TextView = v.findViewById(R.id.plate)
+        val plate: android.widget.EditText = v.findViewById(R.id.plate)
+        val out: Button = v.findViewById(R.id.out)
         val name: android.widget.EditText = v.findViewById(R.id.name)
         val model: android.widget.AutoCompleteTextView = v.findViewById(R.id.model)
         val whenText: TextView = v.findViewById(R.id.`when`)
@@ -60,6 +63,14 @@ class CheckInAdapter(
                     }
                 }
             }
+            val savePlate = {
+                entry?.let { e ->
+                    val p = plate.text.toString().trim()
+                    if (p.isNotEmpty() && p.filter { it.isLetterOrDigit() }.uppercase() != e.plate) onPlateEdit(e, p)
+                }
+            }
+            plate.setOnFocusChangeListener { _, has -> if (!has) savePlate() }
+            plate.setOnEditorActionListener { _, _, _ -> savePlate(); false }
             model.setOnItemClickListener { _, _, _, _ -> save() }
             for (f in listOf(name, model)) {
                 f.setOnFocusChangeListener { _, has -> if (!has) save() }
@@ -78,15 +89,17 @@ class CheckInAdapter(
         val ctx = h.itemView.context
         h.entry = e
         h.mark.setBackgroundColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly else R.color.checkin))
-        h.plate.text = e.plateFormatted + if (e.isMonthly) "\nMONTHLY" else ""
+        if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
         h.plate.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
         // never overwrite what the user is typing
         if (!h.name.hasFocus()) h.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
         if (!h.model.hasFocus()) h.model.setText(e.model ?: "", false)
         if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
-        h.whenText.text = "${dateFmt.format(Date(e.entryTime))}\n${timeFmt.format(Date(e.entryTime))}"
-        h.plate.setOnClickListener { onPlateClick(e) }
-        h.plate.setOnLongClickListener { onLongClick(e); true }
+        h.whenText.text = "${dateFmt.format(Date(e.entryTime))}\n${timeFmt.format(Date(e.entryTime))}" +
+            if (e.isMonthly) "\nMONTHLY" else ""
+        h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.checkin))
+        h.whenText.setOnLongClickListener { onLongClick(e); true }
+        h.out.setOnClickListener { h.itemView.clearFocus(); onOut(e) }
     }
 
     companion object {
@@ -100,15 +113,26 @@ class CheckInAdapter(
 /** Daily vehicles seen leaving: collect the amount, then Check out. ✕ = not actually leaving. */
 class LeavingAdapter(
     private val amountFor: (VehicleEntry) -> Int,
-    private val onPlateClick: (VehicleEntry) -> Unit,
+    private val onPlateEdit: (VehicleEntry, String) -> Unit,
     private val onCheckout: (VehicleEntry) -> Unit,
     private val onNotLeaving: (VehicleEntry) -> Unit
 ) : RecyclerView.Adapter<LeavingAdapter.VH>() {
 
     private var items: List<VehicleEntry> = emptyList()
 
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val plate: TextView = v.findViewById(R.id.plate)
+    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+        val plate: android.widget.EditText = v.findViewById(R.id.plate)
+        var entry: VehicleEntry? = null
+        init {
+            val savePlate = {
+                entry?.let { e ->
+                    val p = plate.text.toString().trim()
+                    if (p.isNotEmpty() && p.filter { it.isLetterOrDigit() }.uppercase() != e.plate) onPlateEdit(e, p)
+                }
+            }
+            plate.setOnFocusChangeListener { _, has -> if (!has) savePlate() }
+            plate.setOnEditorActionListener { _, _, _ -> savePlate(); false }
+        }
         val details: TextView = v.findViewById(R.id.details)
         val checkout: Button = v.findViewById(R.id.checkout)
         val notLeaving: Button = v.findViewById(R.id.notLeaving)
@@ -125,10 +149,10 @@ class LeavingAdapter(
     override fun onBindViewHolder(h: VH, position: Int) {
         val e = items[position]
         val out = e.exitDetectedAt ?: System.currentTimeMillis()
-        h.plate.text = e.plateFormatted
+        h.entry = e
+        if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
         h.details.text = "${e.whoText()} · in ${timeFmt.format(Date(e.entryTime))}" +
             " · out ${timeFmt.format(Date(out))} · ${ParkingFee.duration(e.entryTime, out)}"
-        h.plate.setOnClickListener { onPlateClick(e) }
         h.checkout.text = "Check out ₹${amountFor(e)}"
         h.checkout.setOnClickListener { onCheckout(e) }
         h.notLeaving.setOnClickListener { onNotLeaving(e) }

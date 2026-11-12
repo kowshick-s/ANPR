@@ -372,7 +372,7 @@ class SettingsActivity : AppCompatActivity() {
                 useAiPlates = b.useAiPlates.isChecked,
                 feeAmount = b.feeAmount.int(d.feeAmount).coerceIn(0, 100_000),
                 feePeriodHours = b.feePeriodHours.int(d.feePeriodHours).coerceIn(1, 24 * 31),
-                minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(1, 24 * 60),
+                minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(0, 24 * 60),
                 movingOnly = b.movingOnly.isChecked
             )
         )

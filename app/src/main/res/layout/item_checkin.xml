@@ -1,45 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One parked vehicle: type Token-or-Name / Model directly (saved on Done or when leaving the box) -->
+<!-- One parked vehicle. Everything is edited in the row (no pop-ups): number, Token/Name, Model.
+     Saved on Done/Next or when leaving the box. Out = vehicle leaving. Long-press the time = delete. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingTop="5dp"
-    android:paddingBottom="5dp"
-    android:paddingRight="4dp">
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp"
+    android:paddingRight="2dp">
 
     <View
         android:id="@+id/mark"
         android:layout_width="4dp"
         android:layout_height="32dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginEnd="6dp"
         android:background="@color/checkin" />
 
-    <TextView
+    <EditText
         android:id="@+id/plate"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="4"
-        android:background="@drawable/row_bg"
-        android:focusable="true"
-        android:fontFamily="sans-serif-condensed"
-        android:maxLines="2"
-        android:padding="3dp"
+        android:background="@drawable/cell_field_bg"
+        android:paddingLeft="7dp"
+        android:paddingRight="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:singleLine="true"
         android:textColor="@color/text"
-        android:textSize="17sp"
+        android:textColorHint="#55FFFFFF"
+        android:fontFamily="sans-serif-condensed"
+        android:hint="Vehicle no."
+        android:imeOptions="actionNext"
+        android:inputType="textCapCharacters|textNoSuggestions"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
     <EditText
         android:id="@+id/name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="4dp"
         android:layout_weight="4"
         android:background="@drawable/cell_field_bg"
-        android:hint="Token / Name"
-        android:imeOptions="actionNext"
-        android:inputType="textCapWords"
         android:paddingLeft="7dp"
         android:paddingRight="4dp"
         android:paddingTop="6dp"
@@ -47,20 +51,18 @@
         android:singleLine="true"
         android:textColor="@color/text"
         android:textColorHint="#55FFFFFF"
+        android:hint="Token / Name"
+        android:imeOptions="actionNext"
+        android:inputType="textCapWords"
         android:textSize="14sp" />
 
     <AutoCompleteTextView
         android:id="@+id/model"
-        android:completionThreshold="1"
-        android:popupBackground="@color/surface2"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="4dp"
         android:layout_weight="3"
         android:background="@drawable/cell_field_bg"
-        android:hint="Model"
-        android:imeOptions="actionDone"
-        android:inputType="textCapWords"
         android:paddingLeft="7dp"
         android:paddingRight="4dp"
         android:paddingTop="6dp"
@@ -68,17 +70,36 @@
         android:singleLine="true"
         android:textColor="@color/text"
         android:textColorHint="#55FFFFFF"
+        android:completionThreshold="1"
+        android:hint="Model"
+        android:imeOptions="actionDone"
+        android:inputType="textCapWords"
+        android:popupBackground="@color/surface2"
         android:textSize="14sp" />
 
     <TextView
         android:id="@+id/when"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="4dp"
         android:layout_weight="2.4"
         android:fontFamily="monospace"
         android:gravity="end"
-        android:maxLines="2"
+        android:maxLines="3"
         android:textColor="@color/checkin"
         android:textSize="12sp" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/out"
+        style="@style/TvButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="Out"
+        android:textColor="@color/checkout"
+        android:textStyle="bold" />
 </LinearLayout>

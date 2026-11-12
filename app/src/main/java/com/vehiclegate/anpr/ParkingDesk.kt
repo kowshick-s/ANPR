@@ -14,7 +14,7 @@ import com.vehiclegate.anpr.data.VehicleEntry
  *  - not parked yet                    → CHECK-IN (name filled from the monthly list or history)
  *  - parked, seen again within min stay → ignored (still at the gate / lingering)
  *  - parked, seen again after min stay  → leaving: monthly = auto check-out, daily = CHECK-OUT list
- *  - just checked out, seen again soon  → ignored (still driving out)
+ *  - not parked (incl. checked out)       → CHECK-IN again
  * Plates are matched allowing one misread character.
  */
 class ParkingDesk(private val app: AnprApp) {
@@ -66,11 +66,9 @@ class ParkingDesk(private val app: AnprApp) {
                     Result.Leaving(leaving)
                 }
             }
-        } else {
-            // Just checked out and still driving away?
-            val recentlyOut = dao.closedSince(t - minStayMs).firstOrNull { same(it.plate, detected.plate) }
-            if (recentlyOut != null) return Result.Ignored(recentlyOut.plateFormatted, "just checked out")
         }
+        // Not checked in now → check in (also right after a check-out: a new visit).
+        // The same pass past several cameras is merged earlier, by the re-entry cooldown.
 
         // Token/Name and model come back automatically from earlier visits.
         val (name, model) = previousDetails(detected.plate)
@@ -127,6 +125,15 @@ class ParkingDesk(private val app: AnprApp) {
         val out = e.copy(status = EntryStatus.OUT, exitTime = exit, exitDetectedAt = e.exitDetectedAt ?: exit, amount = amount)
         dao.update(out)
         return out
+    }
+
+    /** Staff pressed Out on a parked vehicle: monthly = checked out, daily = moves to CHECK-OUT. */
+    suspend fun markLeaving(e: VehicleEntry, s: AppSettings) {
+        val cur = dao.get(e.id) ?: e
+        val t = System.currentTimeMillis()
+        if (cur.isMonthly) dao.update(cur.copy(status = EntryStatus.OUT, exitDetectedAt = t, exitTime = t, amount = 0))
+        else dao.update(cur.copy(status = EntryStatus.EXIT, exitDetectedAt = t,
+            amount = ParkingFee.amount(cur.entryTime, t, s.feeAmount, s.feePeriodHours)))
     }
 
     /** "Not leaving" – the exit detection was wrong; keep it parked. */

@@ -76,10 +76,11 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 
 * **Dashboard:** **CHECK-IN** list on the left (green), **CHECK-OUT** list on the right (red). Columns: Vehicle No. · Token / Name · Model · Date & Time.
 * **Check-in:** a vehicle seen for the first time appears at the top of the CHECK-IN list. Type the **Token or Name** (one field) and **Model** straight into the row; each field is saved when you move to the next field or press Enter/OK. Model suggestions appear while typing (common models + every model typed before). Next time the same vehicle comes in, Token/Name and Model are filled in automatically from its last visit (also when the plate was read one character off) – nothing to type.
-* **Wrong number read?** Tap the vehicle number (check-in or check-out list), correct it, **Save**. The app remembers the correction: when the cameras read the same wrong number again, it is saved as the corrected number automatically.
+* **Everything is edited in the row – no pop-ups:** vehicle number, Token/Name, Model. **Out** = vehicle leaving by hand (moves it to CHECK-OUT). Long-press the date/time to delete a wrong read.
+* **Wrong number read?** Type the correct number over it in the row (check-in or check-out list) and press Enter/OK. The app remembers the correction: when the cameras read the same wrong number again, it is saved as the corrected number automatically.
 * **Vehicle details (make/owner):** not fetched online. Free public RC lookup does not exist, paid Vahan RC APIs need a business agreement, and owner data is personal data. Enter the model once – it is remembered for the next visit.
-* **Same vehicle again within the minimum stay** (default 10 min) = still at the gate, ignored.
-* **Seen again after that = leaving.**
+* **Rule:** not checked in → **check in** (also right after a check-out – that is a new visit). Checked in → **leaving**.
+* Only exception: a checked-in vehicle seen again within the **minimum stay** (default 2 min, 0 = off) is still at the gate.
   * Daily vehicles go to **CHECK-OUT** with the amount due. Collect the money, press **Check out ₹…**, then confirm. **✕** = not actually leaving (returns it to Parked).
   * **Monthly users** are checked out automatically (₹0).
 * **Fee:** ₹10 for every started 24 h by default (2 h = ₹10, 25 h = ₹20). Change the amount and period in *Settings → Parking*.
