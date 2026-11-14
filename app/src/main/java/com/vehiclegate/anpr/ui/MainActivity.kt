@@ -46,20 +46,27 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     private val captureAdapter = CaptureAdapter(this)
     private val parkedAdapter = CheckInAdapter(
-        onSave = { e, who, m ->
+        onSave = { e, plate, who, m ->
             lifecycleScope.launch {
-                val dup = withContext(Dispatchers.IO) { app.parking.saveDetails(e, who, m) }
-                if (dup != null) b.lastEvent.text = "Token $who is also given to ${dup.plateFormatted} – check the token"
+                val (err, dup) = withContext(Dispatchers.IO) {
+                    val err = if (plate.isNotBlank()) app.parking.correctPlate(e, plate) else null
+                    err to app.parking.saveDetails(e, who, m)
+                }
+                b.lastEvent.text = when {
+                    err != null -> "Number not changed: $err"
+                    dup != null -> "Token $who is also given to ${dup.plateFormatted} – check the token"
+                    else -> "Saved ${e.plateFormatted}"
+                }
             }
             if (m.isNotBlank()) addModelSuggestion(m)
         },
         modelSuggestions = { modelAdapter },
-        onPlateEdit = { e, p -> correctPlate(e, p) },
         amountFor = { app.parking.amountDue(it, settings) },
         onCheckOut = { checkOut(it) },
         onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  In ${shortTime(it.entryTime)}  ·  ${it.whoText()}") },
         onLongClick = { confirmDelete(it) },
-        loadThumb = { path, iv -> loadThumb(path, iv) }
+        loadThumb = { path, iv -> loadThumb(path, iv) },
+        hideKeyboard = { hideKeyboard() }
     )
     private val outAdapter = OutAdapter(
         onUndo = { e ->

@@ -208,6 +208,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         }
         val parked = if (manual) null else host.parkedFor(c)
         h.cardParked = parked
+        if (parked != null) h.alts.text = "≈ parked ${parked.plateFormatted}"
         h.badge.visibility = if (parked != null) View.VISIBLE else View.GONE
         if (parked != null) h.badge.text = "Parked · leaving?"
         if (h.editorFor != c.id || !h.userEdited) h.showParked(parked)
@@ -259,43 +260,56 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
 // =====================================================================================
 
 /**
- * Parked vehicles. Number, Token/Name and Model are typed directly in the row and saved
- * automatically. Check out = tap twice (first tap shows the amount to confirm).
+ * Parked vehicles: number plate, Token/Name, date & time, Out (tap twice). Nothing is editable by a
+ * stray tap: ▾ shows the plate picture, model and photo, and **Edit** opens number, Token/Name and
+ * model with Save / Cancel.
  */
 class CheckInAdapter(
-    private val onSave: (VehicleEntry, who: String, model: String) -> Unit,
+    /** Edit saved: corrected number (may be unchanged), Token/Name, model. */
+    private val onSave: (VehicleEntry, plate: String, who: String, model: String) -> Unit,
     private val modelSuggestions: () -> ArrayAdapter<String>?,
-    private val onPlateEdit: (VehicleEntry, String) -> Unit,
     private val amountFor: (VehicleEntry) -> Int,
     private val onCheckOut: (VehicleEntry) -> Unit,
     private val onPhoto: (VehicleEntry) -> Unit,
     private val onLongClick: (VehicleEntry) -> Unit,
-    private val loadThumb: (String?, ImageView) -> Unit
+    private val loadThumb: (String?, ImageView) -> Unit,
+    private val hideKeyboard: () -> Unit
 ) : ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
     init { setHasStableIds(true) }
 
     private var expandedId: Long? = null
+    private var editingId: Long? = null
+
+    private fun refresh(vararg ids: Long?) {
+        for (id in ids) if (id != null) currentList.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+    }
 
     private fun toggle(id: Long) {
         val old = expandedId
         expandedId = if (old == id) null else id
-        currentList.indexOfFirst { it.id == old }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
-        if (expandedId != null) currentList.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+        if (editingId != expandedId) editingId = null
+        refresh(old, id)
     }
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val mark: View = v.findViewById(R.id.mark)
+        val plateBox: View = v.findViewById(R.id.plateBox)
         val plateText: TextView = v.findViewById(R.id.plateText)
+        val nameText: TextView = v.findViewById(R.id.nameText)
+        val whenText: TextView = v.findViewById(R.id.`when`)
+        val out: Button = v.findViewById(R.id.out)
         val chevron: ImageView = v.findViewById(R.id.chevron)
         val more: View = v.findViewById(R.id.more)
         val plateThumb: ImageView = v.findViewById(R.id.plateThumb)
+        val modelText: TextView = v.findViewById(R.id.modelText)
+        val photo: View = v.findViewById(R.id.photo)
+        val edit: Button = v.findViewById(R.id.edit)
+        val editBox: View = v.findViewById(R.id.editBox)
         val plate: EditText = v.findViewById(R.id.plate)
         val name: EditText = v.findViewById(R.id.name)
         val model: AutoCompleteTextView = v.findViewById(R.id.model)
-        val whenText: TextView = v.findViewById(R.id.`when`)
-        val photo: View = v.findViewById(R.id.photo)
-        val out: Button = v.findViewById(R.id.out)
+        val save: Button = v.findViewById(R.id.save)
+        val cancel: Button = v.findViewById(R.id.cancel)
         var entry: VehicleEntry? = null
         var armedUntil = 0L
         val disarm = Runnable { armedUntil = 0; entry?.let { setOutText(it) } }
@@ -305,42 +319,30 @@ class CheckInAdapter(
         }
 
         init {
-            val save = {
-                entry?.let { e ->
-                    val n = name.text.toString().trim(); val m = model.text.toString().trim()
-                    if (n != (e.name ?: "") || m != (e.model ?: "")) {
-                        entry = e.copy(name = n, model = m)
-                        onSave(e, n, m)
-                    }
-                }
-            }
-            val savePlate = {
-                entry?.let { e ->
-                    val p = plate.text.toString().trim()
-                    if (p.isNotEmpty() && p.filter { it.isLetterOrDigit() }.uppercase() != e.plate) onPlateEdit(e, p)
-                }
-            }
-            plate.setOnFocusChangeListener { _, has -> if (!has) savePlate() }
-            plate.setOnEditorActionListener { _, _, _ -> savePlate(); false }
-            model.setOnItemClickListener { _, _, _, _ -> save() }
-            val autoSave = Runnable { save() }
-            for (f in listOf(name, model)) {
-                f.setOnFocusChangeListener { _, has -> if (!has) save() }
-                f.setOnEditorActionListener { _, _, _ -> save(); false }
-                afterChange(f) { if (f.hasFocus()) { f.removeCallbacks(autoSave); f.postDelayed(autoSave, 800) } }
-            }
             out.setOnClickListener {
                 val e = entry ?: return@setOnClickListener
                 val now = SystemClock.uptimeMillis()
                 if (now < armedUntil) {
                     armedUntil = 0; out.removeCallbacks(disarm)
-                    itemView.clearFocus()
                     onCheckOut(e)
                 } else {
                     armedUntil = now + 4000
                     out.text = if (e.isMonthly) "Tap again" else "₹${amountFor(e)} · tap again"
                     out.removeCallbacks(disarm); out.postDelayed(disarm, 4000)
                 }
+            }
+            edit.setOnClickListener {
+                val e = entry ?: return@setOnClickListener
+                editingId = e.id; expandedId = e.id
+                refresh(e.id)
+            }
+            cancel.setOnClickListener {
+                editingId = null; hideKeyboard(); entry?.let { refresh(it.id) }
+            }
+            save.setOnClickListener {
+                val e = entry ?: return@setOnClickListener
+                onSave(e, plate.text.toString().trim(), name.text.toString().trim(), model.text.toString().trim())
+                editingId = null; hideKeyboard(); refresh(e.id)
             }
         }
     }
@@ -353,36 +355,46 @@ class CheckInAdapter(
     override fun onBindViewHolder(h: VH, position: Int) {
         val e = getItem(position)
         val ctx = h.itemView.context
+        val wasEditing = h.entry?.id == e.id && h.editBox.visibility == View.VISIBLE
         h.entry = e
-        h.mark.setBackgroundColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly else R.color.checkin))
-        // never overwrite what the user is typing
         h.plateText.text = e.plateFormatted
-        h.plateText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
-        val open = e.id == expandedId
-        h.more.visibility = if (open) View.VISIBLE else View.GONE
-        h.chevron.rotation = if (open) 180f else 0f
-        h.chevron.setOnClickListener { toggle(e.id) }
-        h.plateText.setOnClickListener { toggle(e.id) }
-        h.plateText.setOnLongClickListener { onLongClick(e); true }
-        if (open) {
-            if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
-            loadThumb(com.vehiclegate.anpr.Pictures.plateFile(e.snapshotPath)?.absolutePath, h.plateThumb)
-            h.plateThumb.visibility = if (com.vehiclegate.anpr.Pictures.plateFile(e.snapshotPath) != null) View.VISIBLE else View.GONE
-            h.plateThumb.setOnClickListener { onPhoto(e) }
-        }
-        if (!h.name.hasFocus()) h.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
-        if (!h.model.hasFocus()) h.model.setText(e.model ?: "", false)
-        if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
+        h.plateBox.setBackgroundResource(if (e.isMonthly) R.drawable.plate_small_monthly_bg else R.drawable.plate_small_bg)
+        val who = e.name?.takeIf { it.isNotBlank() } ?: e.token?.takeIf { it.isNotBlank() }
+        h.nameText.text = who ?: "–"
+        h.nameText.setTextColor(ContextCompat.getColor(ctx, if (who != null) R.color.text else R.color.text_dim))
         val now = System.currentTimeMillis()
         h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))}\n${ParkingFee.duration(e.entryTime, now)} parked" +
-            (if (e.isMonthly) " · MONTHLY" else "") +
+            (if (e.isMonthly) " · monthly" else "") +
             (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
         h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))
         h.whenText.setOnLongClickListener { onLongClick(e); true }
-        h.whenText.setOnClickListener { onPhoto(e) }
-        h.photo.visibility = if (e.snapshotPath != null) View.VISIBLE else View.INVISIBLE
-        h.photo.setOnClickListener { onPhoto(e) }
+        h.plateBox.setOnLongClickListener { onLongClick(e); true }
+        h.plateBox.setOnClickListener { toggle(e.id) }
+        h.nameText.setOnClickListener { toggle(e.id) }
+        h.chevron.setOnClickListener { toggle(e.id) }
         if (SystemClock.uptimeMillis() >= h.armedUntil) h.setOutText(e)
+
+        val open = e.id == expandedId
+        val editing = e.id == editingId
+        h.chevron.rotation = if (open) 180f else 0f
+        h.more.visibility = if (open && !editing) View.VISIBLE else View.GONE
+        h.editBox.visibility = if (editing) View.VISIBLE else View.GONE
+        if (open && !editing) {
+            val plateFile = com.vehiclegate.anpr.Pictures.plateFile(e.snapshotPath)
+            h.plateThumb.visibility = if (plateFile != null) View.VISIBLE else View.GONE
+            if (plateFile != null) loadThumb(plateFile.absolutePath, h.plateThumb)
+            h.plateThumb.setOnClickListener { onPhoto(e) }
+            h.modelText.text = e.model?.takeIf { it.isNotBlank() }?.let { "Model: $it" } ?: "Model: –"
+            h.photo.visibility = if (e.snapshotPath != null) View.VISIBLE else View.GONE
+            h.photo.setOnClickListener { onPhoto(e) }
+        }
+        if (editing && !wasEditing) {
+            h.plate.setText(e.plateFormatted)
+            h.name.setText(who ?: "")
+            h.model.setText(e.model ?: "", false)
+            if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
+            h.name.requestFocus()
+        }
     }
 
     companion object {

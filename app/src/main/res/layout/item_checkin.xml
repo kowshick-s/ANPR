@@ -1,62 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One parked vehicle, one line: number · Token/Name (type here) · time · Check out (tap twice) · ▾.
-     ▾ opens: correct the number, model, picture. Long-press the time = delete. -->
+<!-- One parked vehicle: number plate · Token/Name · date & time · Out (tap twice) · ▾.
+     ▾ shows the plate picture, model, photo and Edit (number, Token/Name, model). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:paddingStart="2dp"
-    android:paddingTop="2dp"
+    android:paddingTop="3dp"
     android:paddingEnd="2dp"
-    android:paddingBottom="2dp">
+    android:paddingBottom="3dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="38dp"
+        android:minHeight="40dp"
         android:orientation="horizontal">
 
-        <View
-            android:id="@+id/mark"
-            android:layout_width="3dp"
-            android:layout_height="26dp"
-            android:layout_marginEnd="8dp"
-            android:background="@color/checkin" />
-
-        <TextView
-            android:id="@+id/plateText"
+        <!-- number plate -->
+        <LinearLayout
+            android:id="@+id/plateBox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/row_bg"
+            android:background="@drawable/plate_small_bg"
             android:clickable="true"
             android:focusable="true"
-            android:fontFamily="@font/inter_semibold"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
+            android:orientation="horizontal"
+            android:padding="1.5dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="@drawable/ind_strip_left"
+                android:fontFamily="@font/inter_bold"
+                android:gravity="center"
+                android:paddingStart="3dp"
+                android:paddingEnd="3dp"
+                android:text="IND"
+                android:textColor="#FFFFFF"
+                android:textSize="7sp" />
+
+            <TextView
+                android:id="@+id/plateText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/inter_bold"
+                android:letterSpacing="0.04"
+                android:paddingStart="8dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="9dp"
+                android:paddingBottom="3dp"
+                android:singleLine="true"
+                android:textColor="#111111"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/nameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/inter_medium"
             android:singleLine="true"
             android:textColor="@color/text"
             android:textSize="15sp" />
-
-        <EditText
-            android:id="@+id/name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/cell_field_bg"
-                android:minHeight="34dp"
-                android:paddingStart="10dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:singleLine="true"
-                android:textColor="@color/text"
-                android:textColorHint="@color/text_dim"
-            android:hint="Token / Name"
-            android:imeOptions="actionDone|flagNoExtractUi"
-            android:inputType="textCapWords"
-            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/when"
@@ -79,7 +88,7 @@
             style="@style/TvButton.OutSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="8dp"
             android:minHeight="32dp"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
@@ -96,58 +105,35 @@
             android:src="@drawable/ic_expand" />
     </LinearLayout>
 
+    <!-- ▾ details -->
     <LinearLayout
         android:id="@+id/more"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="11dp"
+        android:paddingStart="10dp"
         android:paddingBottom="4dp"
         android:visibility="gone">
 
-        <EditText
-            android:id="@+id/plate"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="4"
-            android:background="@drawable/cell_field_bg"
-                android:minHeight="34dp"
-                android:paddingStart="10dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:singleLine="true"
-                android:textColor="@color/text"
-                android:textColorHint="@color/text_dim"
-            android:fontFamily="@font/inter_semibold"
-            android:hint="Correct the number"
-            android:imeOptions="actionNext|flagNoExtractUi"
-            android:inputType="textCapCharacters|textNoSuggestions"
-            android:textSize="14sp" />
+        <ImageView
+            android:id="@+id/plateThumb"
+            android:layout_width="84dp"
+            android:layout_height="32dp"
+            android:background="@drawable/thumb_bg"
+            android:contentDescription="Plate picture"
+            android:scaleType="fitCenter" />
 
-        <AutoCompleteTextView
-            android:id="@+id/model"
+        <TextView
+            android:id="@+id/modelText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="4"
-            android:background="@drawable/cell_field_bg"
-                android:minHeight="34dp"
-                android:paddingStart="10dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:singleLine="true"
-                android:textColor="@color/text"
-                android:textColorHint="@color/text_dim"
-            android:completionThreshold="1"
-            android:dropDownWidth="260dp"
-            android:hint="Model"
-            android:imeOptions="actionDone|flagNoExtractUi"
-            android:inputType="textCapWords"
-            android:popupBackground="@drawable/card_bg"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/text_dim"
             android:textSize="13sp" />
 
         <ImageButton
@@ -155,18 +141,128 @@
             style="@style/IconButton"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:layout_marginStart="4dp"
             android:contentDescription="View picture"
             android:padding="8dp"
             android:src="@drawable/ic_photo" />
 
-        <ImageView
-            android:id="@+id/plateThumb"
-            android:layout_width="78dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="4dp"
-            android:background="@drawable/thumb_bg"
-            android:contentDescription="Plate"
-            android:scaleType="fitCenter" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/edit"
+            style="@style/TvButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:drawableStart="@drawable/ic_edit"
+            android:drawablePadding="6dp"
+            android:minHeight="34dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="14dp"
+            android:text="Edit" />
+    </LinearLayout>
+
+    <!-- Edit mode -->
+    <LinearLayout
+        android:id="@+id/editBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="vertical"
+        android:paddingStart="10dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/plate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="4"
+                android:background="@drawable/cell_field_bg"
+                android:minHeight="36dp"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color/text_dim"
+                android:fontFamily="@font/inter_semibold"
+                android:hint="Vehicle no."
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textCapCharacters|textNoSuggestions"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="4"
+                android:background="@drawable/cell_field_bg"
+                android:minHeight="36dp"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color/text_dim"
+                android:hint="Token / Name"
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textCapWords"
+                android:textSize="14sp" />
+
+            <AutoCompleteTextView
+                android:id="@+id/model"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="3"
+                android:background="@drawable/cell_field_bg"
+                android:minHeight="36dp"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color/text_dim"
+                android:completionThreshold="1"
+                android:dropDownWidth="260dp"
+                android:hint="Model"
+                android:imeOptions="actionDone|flagNoExtractUi"
+                android:inputType="textCapWords"
+                android:popupBackground="@drawable/card_bg"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="end|center_vertical"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/cancel"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="34dp"
+                android:text="Cancel"
+                android:textColor="@color/text_dim" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/save"
+                style="@style/TvButton.Filled"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minHeight="34dp"
+                android:text="Save" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
