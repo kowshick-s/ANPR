@@ -107,6 +107,9 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
     var expandedId: Long? = null
         private set
 
+    /** Bumped each time the manual check-in card is opened → its fields start empty. */
+    var manualGeneration = 0
+
     /** Card whose required fields must be filled before check-in (who, model). */
     private var required: Triple<Long, Boolean, Boolean>? = null
 
@@ -161,6 +164,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         var capture: Capture? = null
         /** Capture the editor fields were filled for (so rebinding never wipes what is being typed). */
         var editorFor: Long? = null
+        var manualGen = -1
         var parked: VehicleEntry? = null
         /** The parked vehicle this card matches (from any of its readings). */
         var cardParked: VehicleEntry? = null
@@ -261,6 +265,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         val c = getItem(position)
         val manual = c.id == MANUAL_ID
         val open = manual || c.id == expandedId
+        if (manual && h.manualGen != manualGeneration) { h.editorFor = null; h.manualGen = manualGeneration }
         h.capture = c
         h.itemView.isActivated = open
 
@@ -298,6 +303,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             h.editPlate.setText(if (manual) "" else c.plateFormatted)
             h.editName.setText("")
             h.editModel.setText("", false)
+            h.editName.error = null; h.editModel.error = null; h.editPlate.error = null
             h.editHint.text = if (manual) "Type the number – regulars and monthly users are recognised" else ""
             h.ignore.text = if (manual) "Cancel" else "Ignore"
             if (h.editModel.adapter == null) host.modelSuggestions()?.let { h.editModel.setAdapter(it) }
@@ -445,7 +451,8 @@ class CheckInAdapter(
         val wasEditing = h.entry?.id == e.id && h.editBox.visibility == View.VISIBLE
         h.entry = e
         h.plateText.text = e.plateFormatted
-        val manual = e.cameraSummary == ParkingDesk.MANUAL
+        // monthly users are never "manual" (their name needs the room)
+        val manual = e.cameraSummary == ParkingDesk.MANUAL && !e.isMonthly
         h.plateBox.setBackgroundResource(when {
             e.isMonthly -> R.drawable.plate_small_monthly_bg
             manual -> R.drawable.plate_small_manual_bg

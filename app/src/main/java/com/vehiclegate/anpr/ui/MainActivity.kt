@@ -203,6 +203,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
     )
 
     private fun openManual() {
+        if (!manualOpen) captureAdapter.manualGeneration++
         manualOpen = true
         refreshCaptures()
         b.captureList.scrollToPosition(0)
