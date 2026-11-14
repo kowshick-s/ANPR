@@ -1,32 +1,156 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.VehicleGate" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.VehicleGate" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorPrimaryContainer">@color/accent_container</item>
+        <item name="colorOnPrimaryContainer">@color/accent</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorError">@color/error</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorOnSurfaceVariant">@color/text_dim</item>
+        <item name="colorOutline">@color/divider</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_dim</item>
+        <item name="android:textColorHint">@color/text_dim</item>
+        <!-- one font everywhere (bundled Inter, so device fonts don't change the look) -->
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:textViewStyle">@style/Widget.VG.TextView</item>
+        <item name="checkboxStyle">@style/Widget.VG.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.VG.RadioButton</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.VG.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.VG.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.VG.TitleMedium</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.VG.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.VG.BodyMedium</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.VG.LabelLarge</item>
         <!-- landscape phones: type in the box itself, never in a full-screen editor -->
         <item name="android:editTextStyle">@style/InlineEditText</item>
         <item name="android:autoCompleteTextViewStyle">@style/InlineAutoComplete</item>
-        <item name="android:windowBackground">@color/bg</item>
-        <item name="colorPrimary">@color/accent</item>
-        <item name="colorOnPrimary">#000000</item>
-        <item name="colorSecondary">@color/accent</item>
-        <item name="android:statusBarColor">@color/bg</item>
-        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.VG.Dialog</item>
     </style>
 
+    <style name="ThemeOverlay.VG.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/VG.DialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/VG.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/VG.DialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/VG.DialogButton</item>
+    </style>
+    <style name="VG.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+    </style>
+    <style name="VG.DialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+    </style>
+
+    <style name="Widget.VG.TextView" parent="android:Widget.TextView">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+    </style>
+    <style name="Widget.VG.CheckBox" parent="Widget.Material3.CompoundButton.CheckBox">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+    <style name="Widget.VG.RadioButton" parent="Widget.Material3.CompoundButton.RadioButton">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+    <style name="TextAppearance.VG.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+    </style>
+    <style name="TextAppearance.VG.TitleLarge" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+    </style>
+    <style name="TextAppearance.VG.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+    </style>
+    <style name="TextAppearance.VG.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+    </style>
+    <style name="TextAppearance.VG.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
+    </style>
+    <style name="TextAppearance.VG.LabelLarge" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+    </style>
+
+    <!-- Standard button: outlined pill, primary text. Clear focus ring for TV remotes. -->
     <style name="TvButton" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:background">@drawable/focus_bg</item>
-        <item name="android:textColor">@color/text</item>
+        <item name="android:textColor">@color/accent</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:textSize">15sp</item>
-        <item name="android:paddingStart">18dp</item>
-        <item name="android:paddingEnd">18dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
         <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
         <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Main action: filled pill -->
+    <style name="TvButton.Filled">
+        <item name="android:background">@drawable/btn_filled_bg</item>
+        <item name="android:textColor">@color/on_accent</item>
+    </style>
+
+    <!-- Check out: filled red pill -->
+    <style name="TvButton.Checkout">
+        <item name="android:background">@drawable/btn_checkout_bg</item>
+        <item name="android:textColor">@color/on_checkout</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+    </style>
+
+    <!-- Small outlined red pill (Out) -->
+    <style name="TvButton.OutSmall">
+        <item name="android:background">@drawable/btn_out_bg</item>
+        <item name="android:textColor">@color/checkout</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+    </style>
+
+    <style name="IconButton">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/icon_btn_bg</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
     </style>
 
     <style name="FieldLabel">
         <item name="android:textColor">@color/text_dim</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
     </style>
 
     <style name="Field">
@@ -34,13 +158,50 @@
         <item name="android:textColor">@color/text</item>
         <item name="android:textColorHint">@color/text_dim</item>
         <item name="android:textSize">15sp</item>
-        <item name="android:padding">10dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">11dp</item>
+        <item name="android:paddingBottom">11dp</item>
         <item name="android:singleLine">true</item>
     </style>
+
+    <!-- Section heading inside cards -->
+    <style name="SectionTitle">
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+    </style>
+
+    <!-- Table column header -->
+    <style name="ColumnHeader">
+        <item name="android:textColor">@color/text_dim</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <!-- Count badge -->
+    <style name="Badge">
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
     <style name="InlineEditText" parent="Widget.AppCompat.EditText">
         <item name="android:imeOptions">flagNoExtractUi</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
     </style>
     <style name="InlineAutoComplete" parent="Widget.AppCompat.AutoCompleteTextView">
         <item name="android:imeOptions">flagNoExtractUi</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="fontFamily">@font/inter</item>
     </style>
 </resources>

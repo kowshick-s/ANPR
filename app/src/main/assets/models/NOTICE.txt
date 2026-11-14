@@ -15,3 +15,5 @@ distribute, sublicense, and/or sell copies of the Software, and to permit person
 Software is furnished to do so, subject to the following conditions: The above copyright notice and
 this permission notice shall be included in all copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+Inter typeface (app/src/main/res/font) – Copyright (c) 2016 The Inter Project Authors, SIL Open Font License 1.1 (https://openfontlicense.org).

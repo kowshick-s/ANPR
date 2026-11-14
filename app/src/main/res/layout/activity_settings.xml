@@ -15,9 +15,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Settings"
+            android:fontFamily="@font/inter_semibold"
             android:textColor="@color/text"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:textSize="22sp" />
 
         <!-- Cameras -->
         <LinearLayout
@@ -134,6 +134,17 @@
                 android:textColor="@color/accent"
                 android:textSize="13sp"
                 android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Appearance" />
+            <RadioGroup
+                android:id="@+id/themeGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton android:id="@+id/themeSystem" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Same as device" />
+                <RadioButton android:id="@+id/themeLight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Light" />
+                <RadioButton android:id="@+id/themeDark" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dark" />
+            </RadioGroup>
 
             <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site / gate name)" />
             <EditText android:id="@+id/siteTitle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />

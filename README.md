@@ -134,6 +134,10 @@ History is kept in an on-device database (default 30 days, configurable). *Setti
 | OCR interval | 400 ms | the box is overloaded / UI stutters | fast vehicles are missed |
 | Minimum confidence | 45 % | wrong plates are logged | real plates are rejected |
 
+## Appearance
+
+Standard Material 3 design with the bundled Inter font. *Settings → Display → Appearance*: Same as device / Light / Dark.
+
 ## 7. Camera & hardware tips (these matter more than any setting)
 
 * Mount cameras so the plate is **≥ 130 px wide** in the image, facing the plate within ~30°.

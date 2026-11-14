@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#0B0F14</color>
-    <color name="surface">#151B23</color>
-    <color name="surface2">#1E2732</color>
-    <color name="divider">#2A3542</color>
-    <color name="accent">#FFC107</color>
-    <color name="text">#E8EDF2</color>
-    <color name="text_dim">#8A97A8</color>
-    <color name="live">#00E676</color>
-    <color name="warn">#FFB300</color>
-    <color name="error">#FF5252</color>
+    <color name="bg">#F4F6F9</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface2">#EEF2F6</color>
+    <color name="divider">#DDE2E8</color>
+    <color name="accent">#0B57D0</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="accent_container">#DCE6FA</color>
+    <color name="text">#1A1C1E</color>
+    <color name="text_dim">#5E6670</color>
+    <color name="live">#188038</color>
+    <color name="warn">#B06000</color>
+    <color name="error">#C5221F</color>
+    <color name="checkin">#188038</color>
+    <color name="checkin_container">#DDF2E3</color>
+    <color name="checkout">#C5221F</color>
+    <color name="checkout_container">#FBE4E2</color>
+    <color name="on_checkout">#FFFFFF</color>
+    <color name="monthly">#7B3FC4</color>
+    <color name="monthly_text">#7B3FC4</color>
+    <color name="monthly_container">#EEE3FB</color>
     <color name="plate_bg">#FFFFFF</color>
     <color name="plate_text">#111111</color>
     <color name="ind_blue">#1A3E9A</color>
-    <color name="monthly">#9C6ADE</color>
-    <color name="monthly_text">#C9A8FF</color>
-    <color name="checkin">#2ECC71</color>
-    <color name="checkout">#FF5A5F</color>
+    <color name="overlay">#B3000000</color>
 </resources>

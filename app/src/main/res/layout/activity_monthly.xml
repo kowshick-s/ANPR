@@ -10,9 +10,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Monthly users"
-        android:textColor="@color/monthly_text"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:fontFamily="@font/inter_semibold"
+        android:textColor="@color/text"
+        android:textSize="22sp" />
 
     <TextView
         android:id="@+id/summary"

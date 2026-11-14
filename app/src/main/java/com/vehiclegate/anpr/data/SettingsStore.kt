@@ -71,7 +71,9 @@ data class AppSettings(
     /** A parked vehicle seen again sooner than this is still at the gate, not leaving. */
     val minStayMinutes: Int = 2,
     /** AI plate detector + AI plate reader (on device). Off = classic plate finder only. */
-    val useAiPlates: Boolean = true
+    val useAiPlates: Boolean = true,
+    /** 0 = follow the device, 1 = light, 2 = dark */
+    val themeMode: Int = 0
 )
 
 class SettingsStore(context: Context) {
@@ -111,7 +113,8 @@ class SettingsStore(context: Context) {
             feeAmount = prefs.getInt("feeAmount", d.feeAmount),
             feePeriodHours = prefs.getInt("feePeriodHours", d.feePeriodHours),
             minStayMinutes = prefs.getInt("minStayMinutes", d.minStayMinutes),
-            useAiPlates = prefs.getBoolean("useAiPlates", d.useAiPlates)
+            useAiPlates = prefs.getBoolean("useAiPlates", d.useAiPlates),
+            themeMode = prefs.getInt("themeMode", d.themeMode)
         )
     }
 
@@ -133,6 +136,7 @@ class SettingsStore(context: Context) {
             .putInt("feePeriodHours", s.feePeriodHours)
             .putInt("minStayMinutes", s.minStayMinutes)
             .putBoolean("useAiPlates", s.useAiPlates)
+            .putInt("themeMode", s.themeMode)
             .apply()
     }
 
@@ -148,7 +152,7 @@ class SettingsStore(context: Context) {
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
             .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
             .put("feeAmount", st.feeAmount).put("feePeriodHours", st.feePeriodHours)
-            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates)
+            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates).put("themeMode", st.themeMode)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -178,7 +182,8 @@ class SettingsStore(context: Context) {
                 feeAmount = j.optInt("feeAmount", d.feeAmount),
                 feePeriodHours = j.optInt("feePeriodHours", d.feePeriodHours),
                 minStayMinutes = j.optInt("minStayMinutes", d.minStayMinutes),
-                useAiPlates = j.optBoolean("useAiPlates", d.useAiPlates)
+                useAiPlates = j.optBoolean("useAiPlates", d.useAiPlates),
+                themeMode = j.optInt("themeMode", d.themeMode)
             ))
         }
         return cams.size

@@ -1,171 +1,278 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Designed for a 16:9 TV (960×540 dp at 1080p). Also works on tablets in landscape. -->
+<!-- Dashboard: app bar, CHECK-IN (left) and CHECK-OUT (right) cards, status line, camera strip. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
     android:keepScreenOn="true"
-    android:orientation="vertical"
-    android:padding="14dp">
+    android:orientation="vertical">
 
-    <!-- Header -->
+    <!-- App bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:elevation="2dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:minHeight="64dp"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/title"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:text="Vehicle Entry Monitor"
-            android:textColor="@color/text"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_semibold"
+                android:singleLine="true"
+                android:text="Vehicle Entry Monitor"
+                android:textColor="@color/text"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:fontFeatureSettings="tnum"
+                android:text="--"
+                android:textColor="@color/text_dim"
+                android:textSize="13sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/todayCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="18dp"
-            android:background="@drawable/focus_bg"
-            android:paddingLeft="12dp"
-        android:paddingRight="12dp"
-            android:paddingTop="4dp"
-        android:paddingBottom="4dp"
-            android:text="In: 0"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/chip_accent_bg"
+            android:fontFamily="@font/inter_semibold"
+            android:paddingStart="14dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="7dp"
+            android:text="In today: 0"
             android:textColor="@color/accent"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/outCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="18dp"
-            android:background="@drawable/focus_bg"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/chip_checkin_bg"
+            android:fontFamily="@font/inter_semibold"
+            android:paddingStart="14dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="7dp"
             android:text="Out: 0 · ₹0"
-            android:textColor="@color/live"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textColor="@color/checkin"
+            android:textSize="14sp" />
 
-        <TextView
-            android:id="@+id/clock"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="18dp"
-            android:fontFamily="monospace"
-            android:text="--"
-            android:textColor="@color/text"
-            android:textSize="18sp" />
-
-        <androidx.appcompat.widget.AppCompatButton
+        <ImageButton
             android:id="@+id/settingsButton"
-            style="@style/TvButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⚙  Settings" />
+            style="@style/IconButton"
+            android:layout_marginStart="12dp"
+            android:contentDescription="Settings"
+            android:src="@drawable/ic_settings" />
 
-        <androidx.appcompat.widget.AppCompatButton
+        <ImageButton
             android:id="@+id/exitButton"
-            style="@style/TvButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:text="⏻  Exit"
-            android:textColor="@color/error" />
+            style="@style/IconButton"
+            android:layout_marginStart="4dp"
+            android:contentDescription="Exit"
+            android:src="@drawable/ic_power" />
     </LinearLayout>
 
-    <!-- Body: CHECK-IN (green, left) and CHECK-OUT (red, right) -->
+    <!-- Body -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:baselineAligned="false"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp">
 
+        <!-- CHECK-IN -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="10dp"
+            android:layout_marginEnd="12dp"
             android:layout_weight="6"
-            android:background="@drawable/checkin_card_bg"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <TextView
-                android:id="@+id/parkedTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:letterSpacing="0.1"
-                android:text="CHECK-IN (0)"
-                android:textColor="@color/checkin"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+            android:background="@drawable/card_bg"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingLeft="12dp"
-                android:paddingRight="4dp">
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4" android:gravity="start" android:text="Vehicle No." android:textColor="@color/text_dim" android:textSize="12sp" />
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4" android:gravity="start" android:text="Token / Name" android:textColor="@color/text_dim" android:textSize="12sp" />
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="3" android:gravity="start" android:text="Model" android:textColor="@color/text_dim" android:textSize="12sp" />
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.4" android:gravity="end" android:text="Date &amp; Time" android:textColor="@color/text_dim" android:textSize="12sp" />
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="10dp">
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/dot"
+                    android:tint="@color/checkin" />
+
+                <TextView
+                    android:id="@+id/parkedTitle"
+                    style="@style/SectionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Check-in" />
+
+                <TextView
+                    android:id="@+id/parkedCount"
+                    style="@style/Badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/badge_checkin_bg"
+                    android:text="0 parked"
+                    android:textColor="@color/checkin" />
+
+                <TextView
+                    android:id="@+id/parkedHint"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:gravity="end"
+                    android:singleLine="true"
+                    android:text="Tap a field to edit · Out = leaving"
+                    android:textColor="@color/text_dim"
+                    android:textSize="12sp" />
             </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/surface2"
+                android:orientation="horizontal"
+                android:paddingStart="25dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="8dp">
+                <TextView style="@style/ColumnHeader" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4" android:text="Vehicle no." />
+                <TextView style="@style/ColumnHeader" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="4" android:layout_marginStart="6dp" android:text="Token / Name" />
+                <TextView style="@style/ColumnHeader" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="3" android:layout_marginStart="6dp" android:text="Model" />
+                <TextView style="@style/ColumnHeader" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.4" android:gravity="end" android:text="Checked in" />
+                <Space android:layout_width="104dp" android:layout_height="1dp" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
+
+            <TextView
+                android:id="@+id/parkedEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="28dp"
+                android:text="No vehicles parked. New vehicles appear here automatically."
+                android:textColor="@color/text_dim"
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/parkedList"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:descendantFocusability="afterDescendants" />
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="8dp" />
         </LinearLayout>
 
+        <!-- CHECK-OUT -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="4"
-            android:background="@drawable/checkout_card_bg"
-            android:orientation="vertical"
-            android:padding="10dp">
+            android:background="@drawable/card_bg"
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/leavingTitle"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:letterSpacing="0.1"
-                android:text="CHECK-OUT (0)"
-                android:textColor="@color/checkout"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="10dp">
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/dot"
+                    android:tint="@color/checkout" />
+
+                <TextView
+                    android:id="@+id/leavingTitle"
+                    style="@style/SectionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Check-out" />
+
+                <TextView
+                    android:id="@+id/leavingCount"
+                    style="@style/Badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/badge_checkout_bg"
+                    android:text="0"
+                    android:textColor="@color/checkout" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
 
             <TextView
                 android:id="@+id/leavingEmpty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingTop="10dp"
+                android:gravity="center"
+                android:padding="28dp"
                 android:text="Vehicles seen leaving appear here with the amount to collect."
                 android:textColor="@color/text_dim"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/leavingList"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="4dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="8dp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -173,16 +280,22 @@
         android:id="@+id/lastEvent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="20dp"
+        android:ellipsize="end"
         android:singleLine="true"
-        android:textColor="@color/warn"
-        android:textSize="12sp" />
+        android:textColor="@color/text_dim"
+        android:textSize="13sp" />
 
-    <!-- Live camera tiles (added at runtime) -->
+    <!-- Camera tiles (added at runtime) -->
     <LinearLayout
         android:id="@+id/cameraStrip"
         android:layout_width="match_parent"
-        android:layout_height="118dp"
-        android:layout_marginTop="12dp"
+        android:layout_height="104dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="14dp"
         android:orientation="horizontal" />
 </LinearLayout>

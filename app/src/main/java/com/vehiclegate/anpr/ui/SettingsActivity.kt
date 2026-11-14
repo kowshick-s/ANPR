@@ -342,6 +342,7 @@ class SettingsActivity : AppCompatActivity() {
         b.minStayMinutes.setText(s.minStayMinutes.toString())
         b.strictStates.isChecked = s.strictStates
         b.useAiPlates.isChecked = s.useAiPlates
+        b.themeGroup.check(when (s.themeMode) { 1 -> com.vehiclegate.anpr.R.id.themeLight; 2 -> com.vehiclegate.anpr.R.id.themeDark; else -> com.vehiclegate.anpr.R.id.themeSystem })
         b.movingOnly.isChecked = s.movingOnly
         b.cooldown.setText(s.cooldownSec.toString())
         b.minReads.setText(s.minReads.toString())
@@ -373,11 +374,19 @@ class SettingsActivity : AppCompatActivity() {
                 feeAmount = b.feeAmount.int(d.feeAmount).coerceIn(0, 100_000),
                 feePeriodHours = b.feePeriodHours.int(d.feePeriodHours).coerceIn(1, 24 * 31),
                 minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(0, 24 * 60),
-                movingOnly = b.movingOnly.isChecked
+                movingOnly = b.movingOnly.isChecked,
+                themeMode = themeMode()
             )
         )
         app.settingsStore.saveCameras(cameras)
         toast("Saved")
+        AnprApp.applyTheme(themeMode())
+    }
+
+    private fun themeMode() = when (b.themeGroup.checkedRadioButtonId) {
+        com.vehiclegate.anpr.R.id.themeLight -> 1
+        com.vehiclegate.anpr.R.id.themeDark -> 2
+        else -> 0
     }
 
     override fun onBackPressed() {

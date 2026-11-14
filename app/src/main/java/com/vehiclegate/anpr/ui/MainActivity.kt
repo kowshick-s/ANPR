@@ -123,13 +123,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         lifecycleScope.launch {
             app.db.entries().parked().collect { list ->
                 parkedAdapter.submitList(list)
-                b.parkedTitle.text = "CHECK-IN (${list.size} parked) · edit number, Token/Name, Model in the row · Out = leaving"
+                b.parkedCount.text = "${list.size} parked"
+                b.parkedEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             }
         }
         lifecycleScope.launch {
             app.db.entries().leaving().collect { list ->
                 leavingAdapter.submit(list)
-                b.leavingTitle.text = "CHECK-OUT (${list.size}) · collect and press Check out"
+                b.leavingCount.text = "${list.size}"
                 b.leavingEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             }
         }

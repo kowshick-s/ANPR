@@ -49,7 +49,7 @@ class CheckInAdapter(
         val mark: View = v.findViewById(R.id.mark)
         val plate: android.widget.EditText = v.findViewById(R.id.plate)
         val out: Button = v.findViewById(R.id.out)
-        val photo: TextView = v.findViewById(R.id.photo)
+        val photo: View = v.findViewById(R.id.photo)
         val name: android.widget.EditText = v.findViewById(R.id.name)
         val model: android.widget.AutoCompleteTextView = v.findViewById(R.id.model)
         val whenText: TextView = v.findViewById(R.id.`when`)
@@ -109,7 +109,7 @@ class CheckInAdapter(
         if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
         h.whenText.text = "${dateFmt.format(Date(e.entryTime))}\n${timeFmt.format(Date(e.entryTime))}" +
             if (e.isMonthly) "\nMONTHLY" else ""
-        h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.checkin))
+        h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))
         h.whenText.setOnLongClickListener { onLongClick(e); true }
         h.whenText.setOnClickListener { onPhoto(e) }
         h.photo.visibility = if (e.snapshotPath != null) View.VISIBLE else View.INVISIBLE
@@ -151,7 +151,7 @@ class LeavingAdapter(
         }
         val details: TextView = v.findViewById(R.id.details)
         val checkout: Button = v.findViewById(R.id.checkout)
-        val notLeaving: Button = v.findViewById(R.id.notLeaving)
+        val notLeaving: View = v.findViewById(R.id.notLeaving)
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -167,7 +167,7 @@ class LeavingAdapter(
         val out = e.exitDetectedAt ?: System.currentTimeMillis()
         h.entry = e
         if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
-        h.details.text = (if (e.snapshotPath != null) "📷 " else "") + "${e.whoText()} · in ${timeFmt.format(Date(e.entryTime))}" +
+        h.details.text = "${e.whoText()} · in ${timeFmt.format(Date(e.entryTime))}" +
             " · out ${timeFmt.format(Date(out))} · ${ParkingFee.duration(e.entryTime, out)}"
         h.details.setOnClickListener { onPhoto(e) }
         h.checkout.text = "Check out ₹${amountFor(e)}"
