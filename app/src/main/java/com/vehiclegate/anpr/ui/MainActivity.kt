@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         askPermissionsOnce()
         VoiceInput.attachMic(b.search) {
             hideKeyboard()
-            voice.listen(settings.voiceLanguage, "say the token or bike number") { alts ->
+            voice.listen("en-IN", "say the token or bike number") { alts ->
                 val q = com.vehiclegate.anpr.core.VoiceParse.searchText(alts)
                 b.lastEvent.text = "Heard: \"${alts.first()}\" → searching $q"
                 b.search.setText(q)
@@ -272,6 +272,17 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
     private fun checkIn(c: Capture, plate: String, who: String, model: String, auto: Boolean) {
         val manual = c.id == CaptureAdapter.MANUAL_ID
         lifecycleScope.launch {
+            if (!auto) {
+                // Token / Name and Model are required (filled from history / monthly list when known)
+                val need = withContext(Dispatchers.IO) { app.parking.missingDetails(plate, who, model) }
+                if (need != null) {
+                    val (needWho, needModel) = need
+                    b.lastEvent.text = "Type " + listOfNotNull(if (needWho) "Token / Name" else null, if (needModel) "Model" else null)
+                        .joinToString(" and ") + " to check in"
+                    captureAdapter.requireFields(c.id, needWho, needModel)
+                    return@launch
+                }
+            }
             val dup = withContext(Dispatchers.IO) { app.parking.duplicateToken(who) }
             val (entry, err) = withContext(Dispatchers.IO) {
                 app.parking.checkIn(if (manual) null else c, plate, who, model)
@@ -336,7 +347,8 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     override fun speakAll(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit) {
         hideKeyboard()
-        voice.listen(settings.voiceLanguage, "say the bike number, then token / name and model") { alts ->
+        // English recogniser: number and model come back as said (Tamil number words still understood)
+        voice.listen("en-IN", "say the bike number, then token / name and model") { alts ->
             val s = com.vehiclegate.anpr.core.VoiceParse.parse(alts, models()) ?: return@listen
             b.lastEvent.text = "Heard: \"${s.heard}\"" + if (s.plate == null) " – no bike number found, speak again or type it" else ""
             fill(s)
@@ -345,7 +357,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     override fun speakModel(fill: (List<String>) -> Unit) {
         hideKeyboard()
-        voice.listen(settings.voiceLanguage, "say the model") { alts ->
+        voice.listen("en-IN", "say the model") { alts ->
             val m = alts.flatMap { com.vehiclegate.anpr.core.VoiceParse.matchModels(it, models()) }.distinct().take(6)
             b.lastEvent.text = "Heard: \"${alts.first()}\"" + if (m.isEmpty()) " – no known model matched, typed as said" else " – pick from the list"
             fill(m.ifEmpty { listOf(alts.first().trim()) })

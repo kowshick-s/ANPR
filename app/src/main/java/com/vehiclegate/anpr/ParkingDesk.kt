@@ -252,6 +252,19 @@ class ParkingDesk(private val app: AnprApp) {
         return c
     }
 
+    /**
+     * Token/Name and Model are required for a staff check-in. Returns which are missing
+     * (after filling from history / the monthly list), or null when the check-in can go ahead.
+     */
+    suspend fun missingDetails(typed: String, who: String, model: String): Pair<Boolean, Boolean>? {
+        val (compact, _) = normalize(typed) ?: return null // the number itself is checked by checkIn
+        val member = monthlyMemberFor(compact, System.currentTimeMillis())
+        val (name0, model0) = previousDetails(compact)
+        val needWho = who.isBlank() && member?.name.isNullOrBlank() && name0.isBlank()
+        val needModel = model.isBlank() && model0.isBlank() && member == null
+        return if (needWho || needModel) needWho to needModel else null
+    }
+
     /** Wrong readings on the card are fixed automatically next time. */
     private suspend fun rememberCorrections(c: Capture, compact: String, formatted: String) {
         for (r in CaptureLogic.decode(c.readings)) {

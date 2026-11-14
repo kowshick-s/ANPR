@@ -107,6 +107,15 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
     var expandedId: Long? = null
         private set
 
+    /** Card whose required fields must be filled before check-in (who, model). */
+    private var required: Triple<Long, Boolean, Boolean>? = null
+
+    fun requireFields(id: Long, who: Boolean, model: Boolean) {
+        required = Triple(id, who, model)
+        if (id != MANUAL_ID && expandedId != id) expand(id)
+        else currentList.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+    }
+
     init { setHasStableIds(true) }
 
     fun expand(id: Long?) {
@@ -307,6 +316,13 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             h.chips.visibility = if (h.chips.childCount > 0) View.VISIBLE else View.GONE
             if (manual) { h.editPlate.requestFocus(); host.manualShown { h.applySpoken(it) } } else h.runLookup()
         }
+        required?.takeIf { it.first == c.id }?.let { (_, who, model) ->
+            required = null
+            h.itemView.post {
+                if (model && h.editModel.text.isNullOrBlank()) { h.editModel.error = "Required"; h.editModel.requestFocus() }
+                if (who && h.editName.text.isNullOrBlank()) { h.editName.error = "Required"; h.editName.requestFocus() }
+            }
+        }
     }
 
     companion object {
@@ -362,6 +378,7 @@ class CheckInAdapter(
         val plateBox: View = v.findViewById(R.id.plateBox)
         val plateText: TextView = v.findViewById(R.id.plateText)
         val nameText: TextView = v.findViewById(R.id.nameText)
+        val monthlyTag: View = v.findViewById(R.id.monthlyTag)
         val whenText: TextView = v.findViewById(R.id.`when`)
         val out: Button = v.findViewById(R.id.out)
         val chevron: ImageView = v.findViewById(R.id.chevron)
@@ -430,12 +447,16 @@ class CheckInAdapter(
         h.plateBox.setBackgroundResource(if (e.isMonthly) R.drawable.plate_small_monthly_bg else R.drawable.plate_small_bg)
         val who = e.name?.takeIf { it.isNotBlank() } ?: e.token?.takeIf { it.isNotBlank() }
         h.nameText.text = who ?: "–"
-        h.nameText.setTextColor(ContextCompat.getColor(ctx, if (who != null) R.color.text else R.color.text_dim))
+        h.nameText.setTextColor(ContextCompat.getColor(ctx, when {
+            e.isMonthly -> R.color.monthly_text
+            who != null -> R.color.text
+            else -> R.color.text_dim
+        }))
+        h.monthlyTag.visibility = if (e.isMonthly) View.VISIBLE else View.GONE
         val now = System.currentTimeMillis()
         h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))} · ${ParkingFee.duration(e.entryTime, now)}" +
-            (if (e.isMonthly) " · monthly" else "") +
             (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
-        h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))
+        h.whenText.setTextColor(ContextCompat.getColor(ctx, R.color.text_dim))
         h.whenText.setOnLongClickListener { onLongClick(e); true }
         h.plateBox.setOnLongClickListener { onLongClick(e); true }
         h.plateBox.setOnClickListener { toggle(e.id) }
