@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         askPermissionsOnce()
         VoiceInput.attachMic(b.search) {
             hideKeyboard()
-            voice.listen("en-IN", "say the token or bike number") { alts ->
+            voice.listen(settings.voiceLanguage, "say the token, name or bike number") { alts ->
                 val q = com.vehiclegate.anpr.core.VoiceParse.searchText(alts)
                 b.lastEvent.text = "Heard: \"${alts.first()}\" → searching $q"
                 b.search.setText(q)
@@ -347,8 +347,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     override fun speakAll(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit) {
         hideKeyboard()
-        // English recogniser: number and model come back as said (Tamil number words still understood)
-        voice.listen("en-IN", "say the bike number, then token / name and model") { alts ->
+        voice.listen(settings.voiceLanguage, "say the bike number, then token / name and model") { alts ->
             val s = com.vehiclegate.anpr.core.VoiceParse.parse(alts, models()) ?: return@listen
             b.lastEvent.text = "Heard: \"${s.heard}\"" + if (s.plate == null) " – no bike number found, speak again or type it" else ""
             fill(s)

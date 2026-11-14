@@ -20,4 +20,6 @@
     <color name="monthly">#C7A6F5</color>
     <color name="monthly_text">#C7A6F5</color>
     <color name="monthly_container">#382B4F</color>
+    <color name="manual">#F2B456</color>
+    <color name="manual_container">#4A3510</color>
 </resources>

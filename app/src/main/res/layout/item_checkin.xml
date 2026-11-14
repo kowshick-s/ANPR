@@ -81,6 +81,18 @@
                     android:visibility="gone" />
 
                 <TextView
+                    android:id="@+id/manualTag"
+                    style="@style/Badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/manual_tag_bg"
+                    android:text="MANUAL"
+                    android:textColor="@color/manual"
+                    android:textSize="10sp"
+                    android:visibility="gone" />
+
+                <TextView
                     android:id="@+id/nameText"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"

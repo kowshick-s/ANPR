@@ -379,6 +379,7 @@ class CheckInAdapter(
         val plateText: TextView = v.findViewById(R.id.plateText)
         val nameText: TextView = v.findViewById(R.id.nameText)
         val monthlyTag: View = v.findViewById(R.id.monthlyTag)
+        val manualTag: View = v.findViewById(R.id.manualTag)
         val whenText: TextView = v.findViewById(R.id.`when`)
         val out: Button = v.findViewById(R.id.out)
         val chevron: ImageView = v.findViewById(R.id.chevron)
@@ -444,7 +445,13 @@ class CheckInAdapter(
         val wasEditing = h.entry?.id == e.id && h.editBox.visibility == View.VISIBLE
         h.entry = e
         h.plateText.text = e.plateFormatted
-        h.plateBox.setBackgroundResource(if (e.isMonthly) R.drawable.plate_small_monthly_bg else R.drawable.plate_small_bg)
+        val manual = e.cameraSummary == ParkingDesk.MANUAL
+        h.plateBox.setBackgroundResource(when {
+            e.isMonthly -> R.drawable.plate_small_monthly_bg
+            manual -> R.drawable.plate_small_manual_bg
+            else -> R.drawable.plate_small_bg
+        })
+        h.manualTag.visibility = if (manual) View.VISIBLE else View.GONE
         val who = e.name?.takeIf { it.isNotBlank() } ?: e.token?.takeIf { it.isNotBlank() }
         h.nameText.text = who ?: "–"
         h.nameText.setTextColor(ContextCompat.getColor(ctx, when {
@@ -455,7 +462,7 @@ class CheckInAdapter(
         h.monthlyTag.visibility = if (e.isMonthly) View.VISIBLE else View.GONE
         val now = System.currentTimeMillis()
         h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))} · ${ParkingFee.duration(e.entryTime, now)}" +
-            (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
+            ""
         h.whenText.setTextColor(ContextCompat.getColor(ctx, R.color.text_dim))
         h.whenText.setOnLongClickListener { onLongClick(e); true }
         h.plateBox.setOnLongClickListener { onLongClick(e); true }

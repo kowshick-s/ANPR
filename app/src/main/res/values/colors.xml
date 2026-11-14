@@ -24,4 +24,6 @@
     <color name="plate_text">#111111</color>
     <color name="ind_blue">#1A3E9A</color>
     <color name="overlay">#B3000000</color>
+    <color name="manual">#B06000</color>
+    <color name="manual_container">#FCE8CC</color>
 </resources>
