@@ -50,6 +50,23 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/userChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/chip_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:fontFamily="@font/inter_medium"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:singleLine="true"
+            android:textColor="@color/text"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/camerasChip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

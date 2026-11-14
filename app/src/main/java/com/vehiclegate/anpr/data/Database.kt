@@ -61,7 +61,10 @@ data class VehicleEntry(
     /** Vehicle is in the monthly users list */
     val monthly: Boolean? = false,
     /** Vehicle make/model typed by staff, e.g. "Activa 6G" (added in DB version 3) */
-    val model: String? = null
+    val model: String? = null,
+    /** Staff member who checked the vehicle in / out (DB v7) */
+    val checkedInBy: String? = null,
+    val checkedOutBy: String? = null
 ) {
     val isMonthly get() = monthly == true
     val state get() = status ?: EntryStatus.OUT
@@ -184,6 +187,50 @@ interface MonthlyMemberDao {
     suspend fun delete(plate: String)
 }
 
+/** Roles: Admin = everything, Staff = counter, TV = dashboard only. */
+object Role {
+    const val ADMIN = "ADMIN"
+    const val STAFF = "STAFF"
+    const val TV = "TV"
+    fun label(r: String) = when (r) { ADMIN -> "Admin"; TV -> "TV display"; else -> "Staff" }
+}
+
+/** A person (or TV display) that logs in with a PIN. Only the salted PIN hash is stored. */
+@Entity(tableName = "users")
+data class AppUser(
+    @PrimaryKey val id: String,
+    val name: String,
+    val role: String,
+    val pinHash: String,
+    val salt: String,
+    val active: Boolean = true,
+    val createdAt: Long
+)
+
+@Dao
+interface UserDao {
+    @Query("SELECT * FROM users WHERE active = 1 ORDER BY role, name COLLATE NOCASE")
+    fun activeFlow(): Flow<List<AppUser>>
+
+    @Query("SELECT * FROM users WHERE active = 1 ORDER BY role, name COLLATE NOCASE")
+    suspend fun active(): List<AppUser>
+
+    @Query("SELECT * FROM users ORDER BY active DESC, role, name COLLATE NOCASE")
+    fun allFlow(): Flow<List<AppUser>>
+
+    @Query("SELECT * FROM users WHERE id = :id")
+    suspend fun get(id: String): AppUser?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(u: AppUser)
+
+    @Query("SELECT COUNT(*) FROM users WHERE active = 1 AND role = 'ADMIN'")
+    suspend fun adminCount(): Int
+
+    @Query("SELECT COUNT(*) FROM users")
+    suspend fun count(): Int
+}
+
 /** Capture card states. */
 object CaptureStatus {
     const val PENDING = "PENDING"
@@ -268,12 +315,13 @@ interface PlateFixDao {
     suspend fun delete(plate: String)
 }
 
-@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class, Capture::class], version = 6, exportSchema = false)
+@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class, Capture::class, AppUser::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun entries(): VehicleEntryDao
     abstract fun members(): MonthlyMemberDao
     abstract fun fixes(): PlateFixDao
     abstract fun captures(): CaptureDao
+    abstract fun users(): UserDao
 
     companion object {
         /** v1 → v2: parking columns + monthly members table. Keeps existing history. */
@@ -333,9 +381,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6 → v7: users / roles, who checked in / out. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `users` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, " +
+                        "`pinHash` TEXT NOT NULL, `salt` TEXT NOT NULL, `active` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+                db.execSQL("ALTER TABLE vehicle_entries ADD COLUMN checkedInBy TEXT")
+                db.execSQL("ALTER TABLE vehicle_entries ADD COLUMN checkedOutBy TEXT")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "vehicle_gate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration()
                 .build()
     }

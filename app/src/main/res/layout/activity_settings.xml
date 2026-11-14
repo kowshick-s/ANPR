@@ -116,6 +116,14 @@
                 android:layout_marginTop="12dp"
                 android:text="Monthly users (master list) →"
                 android:textColor="@color/monthly_text" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/usersButton"
+                style="@style/TvButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Users &amp; roles (admin, staff, TV displays) →" />
         </LinearLayout>
 
         <!-- Detection -->

@@ -103,7 +103,8 @@ class ParkingDesk(private val app: AnprApp) {
                 d.snapshotPath?.let { Pictures.delete(it) }
                 return Result.Ignored(open.plateFormatted, "monthly user still at the gate")
             }
-            val out = open.copy(status = EntryStatus.OUT, exitDetectedAt = t, exitTime = t, amount = 0, monthly = true)
+            val out = open.copy(status = EntryStatus.OUT, exitDetectedAt = t, exitTime = t, amount = 0, monthly = true,
+                checkedOutBy = CAMERA)
             dao.update(out)
             d.snapshotPath?.let { Pictures.delete(it) }
             return Result.AutoCheckedOut(out)
@@ -115,7 +116,7 @@ class ParkingDesk(private val app: AnprApp) {
         }
         val (_, model) = previousDetails(d.plate)
         val entry = d.copy(status = EntryStatus.IN, name = member.name.ifBlank { previousDetails(d.plate).first },
-            token = "", model = model, monthly = true)
+            token = "", model = model, monthly = true, checkedInBy = CAMERA)
         return Result.CheckedIn(entry.copy(id = dao.insert(entry)))
     }
 
@@ -210,7 +211,8 @@ class ParkingDesk(private val app: AnprApp) {
             name = who.trim().ifBlank { member?.name?.takeIf { it.isNotBlank() } ?: name0 },
             token = "",
             model = model.trim().ifBlank { model0 },
-            monthly = member != null
+            monthly = member != null,
+            checkedInBy = app.session.who
         )
         val saved = entry.copy(id = dao.insert(entry))
         if (c != null) {
@@ -292,14 +294,15 @@ class ParkingDesk(private val app: AnprApp) {
     suspend fun checkOut(e: VehicleEntry, s: AppSettings): VehicleEntry {
         val exit = System.currentTimeMillis()
         val amount = if (e.isMonthly) 0 else ParkingFee.amount(e.entryTime, exit, s.feeAmount, s.feePeriodHours)
-        val out = e.copy(status = EntryStatus.OUT, exitTime = exit, exitDetectedAt = e.exitDetectedAt ?: exit, amount = amount)
+        val out = e.copy(status = EntryStatus.OUT, exitTime = exit, exitDetectedAt = e.exitDetectedAt ?: exit, amount = amount,
+            checkedOutBy = app.session.who)
         dao.update(out)
         return out
     }
 
     /** Checked out by mistake: back to parked. */
     suspend fun undoCheckOut(e: VehicleEntry) =
-        dao.update(e.copy(status = EntryStatus.IN, exitTime = null, exitDetectedAt = null, amount = null))
+        dao.update(e.copy(status = EntryStatus.IN, exitTime = null, exitDetectedAt = null, amount = null, checkedOutBy = null))
 
     /**
      * Last *name* and model typed for this plate (or a plate one character different).
@@ -372,6 +375,8 @@ class ParkingDesk(private val app: AnprApp) {
 
     companion object {
         const val MANUAL = "Manual"
+        /** Recorded as "checked in / out by" for monthly users handled by the cameras */
+        const val CAMERA = "Camera"
         /** Reads of the same vehicle this close in time are merged into one card. */
         private const val MERGE_WINDOW_MS = 3 * 60_000L
         /** Unhandled cards disappear after this. */

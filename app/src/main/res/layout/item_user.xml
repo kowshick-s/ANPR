@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="8dp">
+    <TextView
+        android:id="@+id/name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:fontFamily="@font/inter_medium"
+        android:textColor="@color/text"
+        android:textSize="16sp" />
+    <TextView
+        android:id="@+id/role"
+        style="@style/Badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/badge_accent_bg"
+        android:textColor="@color/accent" />
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/edit"
+        style="@style/TvButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:minHeight="36dp"
+        android:text="Edit" />
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/toggle"
+        style="@style/TvButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:minHeight="36dp"
+        android:textColor="@color/text_dim" />
+</LinearLayout>

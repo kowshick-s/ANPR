@@ -35,6 +35,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!app.session.isAdmin && app.session.user != null && !intent.getBooleanExtra(EXTRA_ADMIN_OK, false)) { finish(); return }
         b = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(b.root)
 
@@ -53,6 +54,10 @@ class SettingsActivity : AppCompatActivity() {
         b.clearHistory.setOnClickListener { confirmClear() }
         b.exportCsv.setOnClickListener { exportCsv() }
         b.exportSettings.setOnClickListener { backupSettings() }
+        b.usersButton.setOnClickListener {
+            startActivity(android.content.Intent(this, UsersActivity::class.java)
+                .putExtra(EXTRA_ADMIN_OK, app.session.isAdmin || intent.getBooleanExtra(EXTRA_ADMIN_OK, false)))
+        }
         b.monthlyUsers.setOnClickListener { startActivity(android.content.Intent(this, MonthlyUsersActivity::class.java)) }
         b.importSettings.setOnClickListener {
             try {
@@ -465,4 +470,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun android.widget.EditText.int(default: Int) = text.toString().trim().toIntOrNull() ?: default
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+
+    companion object {
+        /** Opened after an admin PIN was typed (staff logged in). */
+        const val EXTRA_ADMIN_OK = "adminOk"
+    }
 }

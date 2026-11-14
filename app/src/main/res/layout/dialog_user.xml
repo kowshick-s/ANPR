@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Name (shown on the login screen and on records)" />
+    <EditText android:id="@+id/name" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapWords" />
+    <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Role" />
+    <RadioGroup android:id="@+id/role" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <RadioButton android:id="@+id/roleStaff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="12dp" android:checked="true" android:text="Staff" />
+        <RadioButton android:id="@+id/roleAdmin" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="12dp" android:text="Admin" />
+        <RadioButton android:id="@+id/roleTv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TV display" />
+    </RadioGroup>
+    <TextView android:id="@+id/pinLabel" style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PIN (4–6 digits)" />
+    <EditText android:id="@+id/pin" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberPassword" android:maxLength="6" />
+</LinearLayout>

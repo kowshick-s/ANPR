@@ -8,6 +8,7 @@ class AnprApp : Application() {
     val db: AppDatabase by lazy { AppDatabase.create(this) }
     val settingsStore: SettingsStore by lazy { SettingsStore(this) }
     val parking: ParkingDesk by lazy { ParkingDesk(this) }
+    val session: Session by lazy { Session(this) }
 
     override fun onCreate() {
         super.onCreate()

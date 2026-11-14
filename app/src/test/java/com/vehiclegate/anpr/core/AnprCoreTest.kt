@@ -245,4 +245,18 @@ class AnprCoreTest {
         assertTrue(VoiceParse.matchModels("splendor", models).first().contains("Splendor"))
         assertTrue(VoiceParse.matchModels("jupiter", models).first().contains("Jupiter"))
     }
+
+    @Test
+    fun pinsAreHashed() {
+        val salt = PinHash.newSalt()
+        val h = PinHash.hash("4821", salt)
+        assertTrue(!h.contains("4821"))
+        assertTrue(PinHash.matches("4821", salt, h))
+        assertTrue(!PinHash.matches("4822", salt, h))
+        assertTrue(PinHash.validPin("1234") && PinHash.validPin("123456"))
+        assertTrue(!PinHash.validPin("123") && !PinHash.validPin("12a4"))
+        val code = PinHash.newResetCode()
+        assertEquals(9, code.length)
+        assertEquals(PinHash.normalizeCode(code), PinHash.normalizeCode(code.lowercase()))
+    }
 }

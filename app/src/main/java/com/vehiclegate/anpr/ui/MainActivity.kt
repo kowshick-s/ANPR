@@ -73,13 +73,19 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
     )
     private val outAdapter = OutAdapter(
         onUndo = { e ->
+            // staff can undo for 10 minutes; later only an admin
+            val recent = System.currentTimeMillis() - (e.exitTime ?: 0) < 10 * 60_000L
+            if (recent) undoOut(e) else withAdmin("Undo after 10 minutes needs an admin.") { undoOut(e) }
+        },
+        onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  ${it.whoText()}") }
+    )
+
+    private fun undoOut(e: VehicleEntry) {
             lifecycleScope.launch {
                 withContext(Dispatchers.IO) { app.parking.undoCheckOut(e) }
                 b.lastEvent.text = "Check-out undone: ${e.plateFormatted} is parked again"
             }
-        },
-        onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  ${it.whoText()}") }
-    )
+    }
 
     /** Model suggestions while typing: common models + every model typed before. */
     private var modelAdapter: android.widget.ArrayAdapter<String>? = null
@@ -129,6 +135,12 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // nobody logged in (or a TV display) → login / dashboard
+        val user = app.session.user
+        if (user == null || user.role == com.vehiclegate.anpr.data.Role.TV) {
+            startActivity(Intent(this, LoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            finish(); return
+        }
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
         settings = app.settingsStore.settings()
@@ -145,7 +157,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             known.forEach { addModelSuggestion(it) }
         }
         b.settingsButton.setOnClickListener { openSettings() }
-        b.exitButton.setOnClickListener { confirmExit() }
+        b.exitButton.setOnClickListener { withAdmin("Only an admin can stop the app.") { confirmExit() } }
+        b.userChip.text = "${user.name} · ${com.vehiclegate.anpr.data.Role.label(user.role)}"
+        b.userChip.setOnClickListener { userMenu() }
         b.manualButton.setOnClickListener { openManual() }
         b.camerasChip.setOnClickListener {
             val show = b.cameraStrip.visibility != View.VISIBLE
@@ -509,7 +523,33 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
+    private fun openSettings() = withAdmin("Settings and cameras are for admins.") {
+        startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ADMIN_OK, true))
+    }
+
+    /** Logged-in user: switch user; admins also open the TV dashboard / users. */
+    private fun userMenu() {
+        val menu = androidx.appcompat.widget.PopupMenu(this, b.userChip)
+        menu.menu.add(0, 1, 0, "Switch user")
+        if (app.session.isAdmin) {
+            menu.menu.add(0, 2, 1, "TV dashboard")
+            menu.menu.add(0, 3, 2, "Users & roles")
+        }
+        menu.setOnMenuItemClickListener {
+            when (it.itemId) {
+                1 -> {
+                    app.session.logout()
+                    startActivity(Intent(this, LoginActivity::class.java).putExtra(LoginActivity.EXTRA_SWITCH, true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                    finish()
+                }
+                2 -> startActivity(Intent(this, DashboardActivity::class.java))
+                3 -> startActivity(Intent(this, UsersActivity::class.java))
+            }
+            true
+        }
+        menu.show()
+    }
 
     // ------------------------------------------------------------------ tiles
 
@@ -716,8 +756,10 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         }
     }
 
-    /** Long-press a parked vehicle: remove a wrong entry. */
-    private fun confirmDelete(e: VehicleEntry) {
+    /** Long-press a parked vehicle: remove a wrong entry (admin only). */
+    private fun confirmDelete(e: VehicleEntry) = withAdmin("Only an admin can delete an entry.") { reallyDelete(e) }
+
+    private fun reallyDelete(e: VehicleEntry) {
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Delete ${e.plateFormatted}?")
             .setMessage("Use this only for a wrong entry (no such vehicle). It is removed from the records.")
