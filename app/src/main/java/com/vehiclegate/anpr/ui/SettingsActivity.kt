@@ -3,6 +3,8 @@ package com.vehiclegate.anpr.ui
 import android.content.ContentValues
 import android.os.Build
 import android.os.Bundle
+import android.widget.TextView
+import android.view.View
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -82,6 +84,7 @@ class SettingsActivity : AppCompatActivity() {
                 .setNegativeButton("Cancel", null).show()
         }
         showProtection()
+        setupSections()
 
         // emergency backup by email
         val backup = com.vehiclegate.anpr.backup.BackupStore(this)
@@ -241,6 +244,7 @@ class SettingsActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ cameras
 
     private fun renderCameras() {
+        refreshSummaries()
         b.cameraList.removeAllViews()
         if (cameras.isEmpty()) {
             val tv = android.widget.TextView(this).apply {
@@ -412,6 +416,7 @@ class SettingsActivity : AppCompatActivity() {
 
     /** Current uninstall protection of this device. */
     private fun showProtection() {
+        refreshSummaries()
         val P = com.vehiclegate.anpr.admin.DeviceProtection
         val owner = P.isDeviceOwner(this)
         b.protectStatus.text = when {
@@ -429,7 +434,128 @@ class SettingsActivity : AppCompatActivity() {
         b.protectRelease.visibility = if (owner) android.view.View.VISIBLE else android.view.View.GONE
     }
 
-    private fun save() {
+    // ------------------------------------------------------------------ sections (two panels)
+
+    private class Section(val key: String, val icon: Int, val title: String, val box: View,
+                          val summary: () -> String, val warn: () -> Boolean = { false })
+
+    private lateinit var sections: List<Section>
+    private val rows = HashMap<String, View>()
+    private var current = ""
+    private var memberCount = 0
+    private var userSummary = ""
+
+    private fun setupSections() {
+        val R = com.vehiclegate.anpr.R.drawable
+        val backup = com.vehiclegate.anpr.backup.BackupStore(this)
+        val P = com.vehiclegate.anpr.admin.DeviceProtection
+        sections = listOf(
+            Section("cameras", R.ic_videocam, "Cameras", b.secCameras,
+                { if (cameras.isEmpty()) "No cameras added" else "${cameras.size} camera" + (if (cameras.size == 1) "" else "s") + " · ${cameras.count { it.enabled }} on" },
+                { cameras.isEmpty() }),
+            Section("parking", R.ic_parking, "Parking and fees", b.secParking,
+                { "₹${b.feeAmount.text} per ${b.feePeriodHours.text} h" }),
+            Section("monthly", R.ic_group, "Monthly users", b.secMonthly, { "$memberCount members" }),
+            Section("users", R.ic_lock, "Users and roles", b.secUsers, { userSummary }),
+            Section("detection", R.ic_search, "Plate detection", b.secDetection,
+                { (if (b.useAiPlates.isChecked) "AI on" else "AI off") + " · " + b.commonStates.text.toString().replace(",", ", ") }),
+            Section("display", R.ic_monitor, "Display and voice", b.secDisplay,
+                { listOf(
+                    when (b.themeGroup.checkedRadioButtonId) { com.vehiclegate.anpr.R.id.themeLight -> "Light"; com.vehiclegate.anpr.R.id.themeDark -> "Dark"; else -> "Same as device" },
+                    if (b.voiceGroup.checkedRadioButtonId == com.vehiclegate.anpr.R.id.voiceEnglish) "English" else "Tamil + English"
+                ).joinToString(" · ") }),
+            Section("pictures", R.ic_photo, "Pictures and history", b.secPictures,
+                { "Pictures kept ${b.keepPicturesDays.text} days" + if (b.plateCropOnly.isChecked) " · plate only" else "" }),
+            Section("backup", R.ic_cloud, "Backup and sync", b.secBackup,
+                { when {
+                    !backup.ready -> "Email backup not set up"
+                    !backup.enabled -> "Email backup off"
+                    backup.lastResult.isNotEmpty() -> backup.lastResult
+                    else -> "Email backup on"
+                } },
+                { !backup.ready || !backup.enabled || backup.lastResult.startsWith("Backup failed") }),
+            Section("protection", R.ic_shield, "Device protection", b.secProtection,
+                { when {
+                    P.isKiosk(this) -> "Kiosk mode on"
+                    P.isDeviceOwner(this) -> "Ready for kiosk mode"
+                    P.isAdminActive(this) -> "Uninstall warning on"
+                    else -> "Not protected"
+                } },
+                { !P.isKiosk(this) && !P.isAdminActive(this) }),
+            Section("about", R.ic_info, "About", b.secAbout, { "Build ${aboutBuild()}" })
+        )
+        b.sectionList.removeAllViews()
+        for (s in sections) {
+            val row = layoutInflater.inflate(com.vehiclegate.anpr.R.layout.item_settings_section, b.sectionList, false)
+            row.findViewById<android.widget.ImageView>(com.vehiclegate.anpr.R.id.icon).setImageResource(s.icon)
+            row.findViewById<TextView>(com.vehiclegate.anpr.R.id.title).text = s.title
+            row.setOnClickListener { select(s.key) }
+            b.sectionList.addView(row)
+            rows[s.key] = row
+        }
+        b.advancedToggle.setOnClickListener {
+            val open = b.advancedBox.visibility != View.VISIBLE
+            b.advancedBox.visibility = if (open) View.VISIBLE else View.GONE
+            b.advancedToggle.text = if (open) "Hide advanced" else "Advanced"
+        }
+        b.aboutText.text = buildString {
+            appendLine("Vehicle Entry Monitor – build ${aboutBuild()}")
+            val u = app.session.user
+            if (u != null) appendLine("Logged in: ${u.name} (${com.vehiclegate.anpr.data.Role.label(u.role)})")
+            appendLine("Cameras on this device: ${cameras.count { it.enabled }}")
+            append("Package: $packageName")
+        }
+        b.checkUpdate.setOnClickListener {
+            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse("https://github.com/kowshick-s/ANPR/releases/latest"))) }
+            catch (_: Exception) { toast("No browser on this device") }
+        }
+        lifecycleScope.launch {
+            memberCount = withContext(Dispatchers.IO) { app.db.members().all().size }
+            val users = withContext(Dispatchers.IO) { app.db.users().active() }
+            userSummary = listOf(
+                com.vehiclegate.anpr.data.Role.ADMIN to "admin", com.vehiclegate.anpr.data.Role.STAFF to "staff",
+                com.vehiclegate.anpr.data.Role.TV to "TV"
+            ).joinToString(" · ") { (r, l) -> "${users.count { it.role == r }} $l" }
+            refreshSummaries()
+        }
+        select(intent.getStringExtra(EXTRA_SECTION) ?: "cameras")
+    }
+
+    private fun aboutBuild(): String = try {
+        @Suppress("DEPRECATION") packageManager.getPackageInfo(packageName, 0).versionCode.toString()
+    } catch (_: Exception) { "?" }
+
+    /** Show one section on the right (saving what was changed in the previous one). */
+    private fun select(key: String) {
+        if (current.isNotEmpty() && current != key) save(quiet = true)
+        current = key
+        for (s in sections) {
+            s.box.visibility = if (s.key == key) View.VISIBLE else View.GONE
+            rows[s.key]?.isSelected = s.key == key
+        }
+        sections.firstOrNull { it.key == key }?.let { b.paneTitle.text = it.title }
+        b.pane.scrollTo(0, 0)
+        refreshSummaries()
+    }
+
+    private fun refreshSummaries() {
+        if (!::sections.isInitialized) return
+        for (s in sections) {
+            val row = rows[s.key] ?: continue
+            val text = try { s.summary() } catch (_: Exception) { "" }
+            row.findViewById<TextView>(com.vehiclegate.anpr.R.id.summary).text = text
+            row.findViewById<View>(com.vehiclegate.anpr.R.id.warn).visibility = if (s.warn()) View.VISIBLE else View.GONE
+            if (s.key == current) b.paneSummary.text = text
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::b.isInitialized && !isFinishing) save(quiet = true)
+    }
+
+    private fun save(quiet: Boolean = false) {
         com.vehiclegate.anpr.backup.BackupStore(this).apply {
             enabled = b.backupEnabled.isChecked
             gmail = b.backupGmail.text.toString()
@@ -463,8 +589,9 @@ class SettingsActivity : AppCompatActivity() {
             )
         )
         app.settingsStore.saveCameras(cameras)
-        toast("Saved")
+        if (!quiet) toast("Saved")
         AnprApp.applyTheme(themeMode())
+        refreshSummaries()
     }
 
     private fun themeMode() = when (b.themeGroup.checkedRadioButtonId) {
@@ -547,5 +674,7 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         /** Opened after an admin PIN was typed (staff logged in). */
         const val EXTRA_ADMIN_OK = "adminOk"
+        /** Section to open first, e.g. "backup" */
+        const val EXTRA_SECTION = "section"
     }
 }
