@@ -137,7 +137,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             host.lookup(c, typed) { text, hint ->
                 if (capture?.id != forId) return@lookup
                 editHint.text = text
-                setParked((hint as? ParkingDesk.Hint.Parked)?.entry)
+                showParked((hint as? ParkingDesk.Hint.Parked)?.entry)
                 if (hint is ParkingDesk.Hint.Regular) {
                     if (editName.text.isNullOrBlank() && !editName.hasFocus()) editName.setText(hint.name)
                     if (editModel.text.isNullOrBlank() && !editModel.hasFocus()) editModel.setText(hint.model, false)
@@ -145,7 +145,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             }
         }
 
-        fun setParked(p: VehicleEntry?) {
+        fun showParked(p: VehicleEntry?) {
             parked = p
             val ctx = itemView.context
             if (p != null) {
@@ -200,7 +200,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             h.editHint.text = if (manual) "Type the number – regulars and monthly users are recognised" else ""
             h.ignore.text = if (manual) "Cancel" else "Ignore"
             if (h.editModel.adapter == null) host.modelSuggestions()?.let { h.editModel.setAdapter(it) }
-            h.setParked(parked)
+            h.showParked(parked)
             // other readings as chips: tap = use that number
             h.chips.removeAllViews()
             if (!manual && readings.size > 1) for (r in readings) {
