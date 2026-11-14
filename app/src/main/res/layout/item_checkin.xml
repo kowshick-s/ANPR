@@ -193,7 +193,9 @@
                 android:hint="Vehicle no."
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textCapCharacters|textNoSuggestions"
-                android:textSize="14sp" />
+                android:textSize="14sp"     android:drawableEnd="@drawable/ic_mic"
+                android:drawablePadding="4dp"
+                />
 
             <EditText
                 android:id="@+id/name"

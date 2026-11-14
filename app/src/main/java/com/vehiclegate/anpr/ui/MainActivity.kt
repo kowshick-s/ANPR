@@ -68,7 +68,8 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         loadThumb = { path, iv -> loadThumb(path, iv) },
         hideKeyboard = { hideKeyboard() },
         speakModel = { fill -> speakModel(fill) },
-        speakWho = { fill -> speakWho(fill) }
+        speakWho = { fill -> speakWho(fill) },
+        speakPlate = { fill -> speakPlate(fill) }
     )
     private val outAdapter = OutAdapter(
         onUndo = { e ->
@@ -357,6 +358,16 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             val text = com.vehiclegate.anpr.core.VoiceParse.searchText(alts)
             b.lastEvent.text = "Heard: \"${alts.first()}\""
             fill(text)
+        }
+    }
+
+    override fun speakPlate(fill: (String) -> Unit) {
+        hideKeyboard()
+        voice.listen(settings.voiceLanguage, "say the bike number") { alts ->
+            val s = com.vehiclegate.anpr.core.VoiceParse.parse(alts, emptyList())
+            val p = s?.plate
+            b.lastEvent.text = "Heard: \"${alts.first()}\"" + if (p == null) " – no bike number found, speak again or type it" else ""
+            if (p != null) fill(p.formatted)
         }
     }
 

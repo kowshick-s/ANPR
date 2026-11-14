@@ -98,6 +98,8 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         fun speakAll(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit)
         fun speakModel(fill: (List<String>) -> Unit)
         fun speakWho(fill: (String) -> Unit)
+        /** Voice: the bike number only. */
+        fun speakPlate(fill: (String) -> Unit)
         /** The manual check-in card was opened (start listening straight away). */
         fun manualShown(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit)
     }
@@ -178,6 +180,9 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             speak.setOnClickListener { host.speakAll { applySpoken(it) } }
             VoiceInput.attachMic(editModel) { host.speakModel { showModelChoices(editModel, it) } }
             VoiceInput.attachMic(editName) { host.speakWho { editName.setText(it) } }
+            VoiceInput.attachMic(editPlate) {
+                host.speakPlate { p -> userEdited = true; editPlate.setText(p); runLookup() }
+            }
             thumb.setOnClickListener { capture?.let { host.photo(it) } }
         }
 
@@ -333,7 +338,8 @@ class CheckInAdapter(
     private val loadThumb: (String?, ImageView) -> Unit,
     private val hideKeyboard: () -> Unit,
     private val speakModel: ((List<String>) -> Unit) -> Unit,
-    private val speakWho: ((String) -> Unit) -> Unit
+    private val speakWho: ((String) -> Unit) -> Unit,
+    private val speakPlate: ((String) -> Unit) -> Unit
 ) : ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
     init { setHasStableIds(true) }
@@ -393,6 +399,7 @@ class CheckInAdapter(
             }
             VoiceInput.attachMic(model) { speakModel { showModelChoices(model, it) } }
             VoiceInput.attachMic(name) { speakWho { name.setText(it) } }
+            VoiceInput.attachMic(plate) { speakPlate { plate.setText(it) } }
             edit.setOnClickListener {
                 val e = entry ?: return@setOnClickListener
                 editingId = e.id; expandedId = e.id
