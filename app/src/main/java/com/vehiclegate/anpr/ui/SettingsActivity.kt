@@ -342,6 +342,8 @@ class SettingsActivity : AppCompatActivity() {
         b.minStayMinutes.setText(s.minStayMinutes.toString())
         b.strictStates.isChecked = s.strictStates
         b.useAiPlates.isChecked = s.useAiPlates
+        b.plateCropOnly.isChecked = s.plateCropOnly
+        b.keepPicturesDays.setText(s.keepPicturesDays.toString())
         b.themeGroup.check(when (s.themeMode) { 1 -> com.vehiclegate.anpr.R.id.themeLight; 2 -> com.vehiclegate.anpr.R.id.themeDark; else -> com.vehiclegate.anpr.R.id.themeSystem })
         b.movingOnly.isChecked = s.movingOnly
         b.cooldown.setText(s.cooldownSec.toString())
@@ -375,7 +377,9 @@ class SettingsActivity : AppCompatActivity() {
                 feePeriodHours = b.feePeriodHours.int(d.feePeriodHours).coerceIn(1, 24 * 31),
                 minStayMinutes = b.minStayMinutes.int(d.minStayMinutes).coerceIn(0, 24 * 60),
                 movingOnly = b.movingOnly.isChecked,
-                themeMode = themeMode()
+                themeMode = themeMode(),
+                plateCropOnly = b.plateCropOnly.isChecked,
+                keepPicturesDays = b.keepPicturesDays.int(d.keepPicturesDays).coerceIn(0, 3650)
             )
         )
         app.settingsStore.saveCameras(cameras)

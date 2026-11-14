@@ -102,6 +102,10 @@ interface VehicleEntryDao {
     @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime IS NOT NULL ORDER BY exitTime DESC LIMIT :limit")
     fun recentOut(limit: Int): Flow<List<VehicleEntry>>
 
+    /** Checked-out visits whose pictures are past the keep period. */
+    @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime < :before AND snapshotPath IS NOT NULL")
+    suspend fun picturesToDrop(before: Long): List<VehicleEntry>
+
     /** Every check-out (for search in the Checked out tab). */
     @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime IS NOT NULL ORDER BY exitTime DESC LIMIT 2000")
     suspend fun outForSearch(): List<VehicleEntry>
@@ -202,7 +206,11 @@ data class Capture(
     val snapshotPath: String?,
     val confidence: Float,
     val cameraSummary: String,
-    val status: String = CaptureStatus.PENDING
+    val status: String = CaptureStatus.PENDING,
+    /** Camera + plate position (0..1) of the last read – same spot = same vehicle (DB v6) */
+    val camId: String? = null,
+    val posX: Float? = null,
+    val posY: Float? = null
 )
 
 @Dao
@@ -225,6 +233,9 @@ interface CaptureDao {
     /** Pending cards nobody handled: expire them (and return their pictures for deleting). */
     @Query("SELECT * FROM captures WHERE status = 'PENDING' AND lastSeen < :before")
     suspend fun stale(before: Long): List<Capture>
+
+    @Query("SELECT * FROM captures WHERE status = 'PENDING' AND id != :exceptId AND firstSeen BETWEEN :from AND :to")
+    suspend fun pendingBetween(from: Long, to: Long, exceptId: Long): List<Capture>
 
     @Query("DELETE FROM captures WHERE lastSeen < :before AND status != 'PENDING'")
     suspend fun deleteBefore(before: Long)
@@ -253,7 +264,7 @@ interface PlateFixDao {
     suspend fun delete(plate: String)
 }
 
-@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class, Capture::class], version = 5, exportSchema = false)
+@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class, Capture::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun entries(): VehicleEntryDao
     abstract fun members(): MonthlyMemberDao
@@ -309,9 +320,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6: capture camera + plate position. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE captures ADD COLUMN camId TEXT")
+                db.execSQL("ALTER TABLE captures ADD COLUMN posX REAL")
+                db.execSQL("ALTER TABLE captures ADD COLUMN posY REAL")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "vehicle_gate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
     }

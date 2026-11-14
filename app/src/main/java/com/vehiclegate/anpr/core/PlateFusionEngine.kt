@@ -11,7 +11,10 @@ data class PlateRead<S>(
     /** Raw OCR confidence 0..1 from the text recogniser. */
     val ocrConfidence: Float,
     val timestampMs: Long,
-    val snapshot: S? = null
+    val snapshot: S? = null,
+    /** Plate centre in the camera's search area, 0..1 (−1 = unknown) */
+    val posX: Float = -1f,
+    val posY: Float = -1f
 ) {
     /** Combined quality of this read: OCR confidence × how well it fitted the plate format. */
     val score: Float get() = (ocrConfidence * plate.formatScore).coerceIn(0f, 1f)
@@ -38,7 +41,11 @@ data class FusedVehicle<S>(
     val totalReads: Int,
     val agreeingReads: Int,
     val cameraVotes: List<CameraVote>,
-    val snapshot: S?
+    val snapshot: S?,
+    /** Camera and plate position of the snapshot read (for grouping on the waiting list) */
+    val cameraId: String? = null,
+    val posX: Float = -1f,
+    val posY: Float = -1f
 )
 
 class FusionParams(
@@ -78,6 +85,11 @@ class PlateFusionEngine<S>(
         val bestPerCamera = HashMap<String, PlateRead<S>>() // keeps one snapshot per camera
     }
 
+    private companion object {
+        const val SAME_SPOT = 0.06f
+        const val SAME_SPOT_MS = 4_000L
+    }
+
     private val lock = Any()
     private val tracks = ArrayList<Track<S>>()
     private val recentCommits = HashMap<String, Long>() // compact plate → last seen time
@@ -91,7 +103,7 @@ class PlateFusionEngine<S>(
                 return
             }
 
-            val track = findTrack(read.compact) ?: Track<S>(read.timestampMs, read.timestampMs).also { tracks += it }
+            val track = findTrack(read.compact) ?: findTrackAt(read) ?: Track<S>(read.timestampMs, read.timestampMs).also { tracks += it }
             track.reads += read.copy(snapshot = null)
             track.lastSeen = maxOf(track.lastSeen, read.timestampMs)
             track.firstSeen = minOf(track.firstSeen, read.timestampMs)
@@ -139,6 +151,21 @@ class PlateFusionEngine<S>(
             if (d < bestDist) { bestDist = d; best = t }
         }
         return best?.takeIf { bestDist <= matchThreshold(compact.length) }
+    }
+
+    /**
+     * Same camera, plate at (almost) the same spot, moments ago → the same vehicle even if OCR read
+     * the text quite differently (shifted / partial reads of a plate standing at the gate).
+     */
+    private fun findTrackAt(read: PlateRead<S>): Track<S>? {
+        if (read.posX < 0) return null
+        return tracks.firstOrNull { t ->
+            t.reads.any {
+                it.cameraId == read.cameraId && it.posX >= 0 &&
+                    kotlin.math.abs(it.posX - read.posX) < SAME_SPOT && kotlin.math.abs(it.posY - read.posY) < SAME_SPOT &&
+                    read.timestampMs - it.timestampMs in 0..SAME_SPOT_MS
+            }
+        }
     }
 
     private fun matchThreshold(len: Int) = if (len >= 9) 2 else 1
@@ -229,7 +256,10 @@ class PlateFusionEngine<S>(
                 totalReads = reads.size,
                 agreeingReads = agreeing.size,
                 cameraVotes = votesByCam,
-                snapshot = snapshotRead?.snapshot
+                snapshot = snapshotRead?.snapshot,
+                cameraId = snapshotRead?.cameraId,
+                posX = snapshotRead?.posX ?: -1f,
+                posY = snapshotRead?.posY ?: -1f
             )
         )
     }

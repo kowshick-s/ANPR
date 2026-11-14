@@ -73,7 +73,11 @@ data class AppSettings(
     /** AI plate detector + AI plate reader (on device). Off = classic plate finder only. */
     val useAiPlates: Boolean = true,
     /** 0 = follow the device, 1 = light, 2 = dark */
-    val themeMode: Int = 0
+    val themeMode: Int = 0,
+    /** Save only the plate crop (≈10 KB) instead of crop + small scene picture (≈50 KB). */
+    val plateCropOnly: Boolean = false,
+    /** Pictures of checked-out visits are deleted after this many days (0 = keep). */
+    val keepPicturesDays: Int = 7
 )
 
 class SettingsStore(context: Context) {
@@ -114,7 +118,9 @@ class SettingsStore(context: Context) {
             feePeriodHours = prefs.getInt("feePeriodHours", d.feePeriodHours),
             minStayMinutes = prefs.getInt("minStayMinutes", d.minStayMinutes),
             useAiPlates = prefs.getBoolean("useAiPlates", d.useAiPlates),
-            themeMode = prefs.getInt("themeMode", d.themeMode)
+            themeMode = prefs.getInt("themeMode", d.themeMode),
+            plateCropOnly = prefs.getBoolean("plateCropOnly", d.plateCropOnly),
+            keepPicturesDays = prefs.getInt("keepPicturesDays", d.keepPicturesDays)
         )
     }
 
@@ -137,6 +143,8 @@ class SettingsStore(context: Context) {
             .putInt("minStayMinutes", s.minStayMinutes)
             .putBoolean("useAiPlates", s.useAiPlates)
             .putInt("themeMode", s.themeMode)
+            .putBoolean("plateCropOnly", s.plateCropOnly)
+            .putInt("keepPicturesDays", s.keepPicturesDays)
             .apply()
     }
 
@@ -152,7 +160,7 @@ class SettingsStore(context: Context) {
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
             .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
             .put("feeAmount", st.feeAmount).put("feePeriodHours", st.feePeriodHours)
-            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates).put("themeMode", st.themeMode)
+            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates).put("themeMode", st.themeMode).put("plateCropOnly", st.plateCropOnly).put("keepPicturesDays", st.keepPicturesDays)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -183,7 +191,9 @@ class SettingsStore(context: Context) {
                 feePeriodHours = j.optInt("feePeriodHours", d.feePeriodHours),
                 minStayMinutes = j.optInt("minStayMinutes", d.minStayMinutes),
                 useAiPlates = j.optBoolean("useAiPlates", d.useAiPlates),
-                themeMode = j.optInt("themeMode", d.themeMode)
+                themeMode = j.optInt("themeMode", d.themeMode),
+                plateCropOnly = j.optBoolean("plateCropOnly", d.plateCropOnly),
+                keepPicturesDays = j.optInt("keepPicturesDays", d.keepPicturesDays)
             ))
         }
         return cams.size

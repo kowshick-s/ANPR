@@ -34,6 +34,18 @@ object CaptureLogic {
         return da.length >= 4 && da == db
     }
 
+    /**
+     * Weaker link, only used for reads close in time: the numbers share 3 digits in a row
+     * (a shifted or partial read: "0597" and "5973" share "597").
+     */
+    fun related(a: String, b: String): Boolean {
+        val da = a.takeLastWhile { it.isDigit() }
+        val db = b.takeLastWhile { it.isDigit() }
+        if (da.length < 3 || db.length < 3) return false
+        for (i in 0..da.length - 3) if (db.contains(da.substring(i, i + 3))) return true
+        return false
+    }
+
     /** Adds [r] to the readings: same plate → evidence adds up. Best first. */
     fun merge(list: List<Reading>, r: Reading): List<Reading> {
         val out = list.toMutableList()

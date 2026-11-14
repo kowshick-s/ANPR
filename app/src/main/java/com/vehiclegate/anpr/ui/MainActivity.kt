@@ -58,7 +58,8 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         amountFor = { app.parking.amountDue(it, settings) },
         onCheckOut = { checkOut(it) },
         onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  In ${shortTime(it.entryTime)}  ·  ${it.whoText()}") },
-        onLongClick = { confirmDelete(it) }
+        onLongClick = { confirmDelete(it) },
+        loadThumb = { path, iv -> loadThumb(path, iv) }
     )
     private val outAdapter = OutAdapter(
         onUndo = { e ->
@@ -136,6 +137,11 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         b.settingsButton.setOnClickListener { openSettings() }
         b.exitButton.setOnClickListener { confirmExit() }
         b.manualButton.setOnClickListener { openManual() }
+        b.camerasChip.setOnClickListener {
+            val show = b.cameraStrip.visibility != View.VISIBLE
+            getSharedPreferences("ui_once", MODE_PRIVATE).edit().putBoolean("showCams", show).apply()
+            b.cameraStrip.visibility = if (show) View.VISIBLE else View.GONE
+        }
         b.tabParked.setOnClickListener { showOut = false; refreshLists() }
         b.tabOut.setOnClickListener { showOut = true; refreshLists() }
         b.search.addTextChangedListener(object : android.text.TextWatcher {
@@ -203,8 +209,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             q.isNotEmpty() -> "${shown.size} found for \"$q\"" + if (q.all { it.isDigit() }) " · token numbers first" else ""
             showOut -> "Latest ${shown.size} check-outs · search to find older ones"
             source.size > shown.size -> "Latest ${shown.size} of ${source.size} parked · search token, number or name"
-            else -> "${source.size} parked · type in a row to edit · Check out = tap twice"
+            else -> ""
         }
+        b.listNote.visibility = if (b.listNote.text.isNullOrEmpty()) View.GONE else View.VISIBLE
         b.listEmpty.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         b.listEmpty.text = when {
             q.isNotEmpty() -> "Nothing found for \"$q\""
@@ -286,6 +293,23 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         }
     }
 
+    override fun mergeMenu(c: Capture, anchor: View) {
+        val others = pending.filter { it.id != c.id }
+        if (others.isEmpty()) { b.lastEvent.text = "No other captured vehicle to join with"; return }
+        val menu = androidx.appcompat.widget.PopupMenu(this, anchor)
+        menu.menu.add(0, 0, 0, "Same vehicle as…").isEnabled = false
+        others.take(12).forEachIndexed { i, o -> menu.menu.add(0, i + 1, i + 1, "${o.plateFormatted}  ·  ${shortTime(o.firstSeen)}") }
+        menu.setOnMenuItemClickListener { item ->
+            val target = others.getOrNull(item.itemId - 1) ?: return@setOnMenuItemClickListener false
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) { app.parking.merge(target, c) }
+                b.lastEvent.text = "Joined ${c.plateFormatted} into ${target.plateFormatted}"
+            }
+            true
+        }
+        menu.show()
+    }
+
     override fun photo(c: Capture) = showPicture(c.snapshotPath, "${c.plateFormatted}  ·  ${shortTime(c.firstSeen)}  ·  ${c.reads} reads")
 
     // small pictures for the capture cards
@@ -321,6 +345,13 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         val cameras = app.settingsStore.cameras().filter { it.enabled && it.url.isNotBlank() }
         buildTiles(cameras)
         if (cameras.isEmpty()) b.lastEvent.text = getString(R.string.no_cameras).replace("\n", " ")
+        b.cameraStrip.visibility = if (cameras.isNotEmpty() && getSharedPreferences("ui_once", MODE_PRIVATE).getBoolean("showCams", false)) View.VISIBLE else View.GONE
+        updateCamerasChip()
+        // more rows on a phone: hide the status / navigation bars (swipe from the edge shows them)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
         // Detection runs in the background service; (re)start it – it applies changed settings –
         // and attach this screen to it.
         AnprService.start(this)
@@ -342,10 +373,12 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         for ((id, st) in AnprEngine.camStates) {
             val t = tiles[id] ?: continue
             setTileStatus(t, st.status, st.message)
+            if (st.status == CameraStream.Status.LIVE) liveCams += id else liveCams -= id
             t.scans = st.scans; t.motion = st.motion; t.reads = st.reads
             t.refreshName()
             st.picture?.let { if (!t.compact) t.picture.setImageBitmap(it) }
         }
+        updateCamerasChip()
         AnprEngine.lastSkipped?.let { b.lastEvent.text = "Last skipped: $it" }
     }
 
@@ -431,6 +464,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         }
     }
 
+    private val liveCams = HashSet<String>()
+
+    private fun updateCamerasChip() {
+        val n = tiles.size
+        b.camerasChip.visibility = if (n == 0) View.GONE else View.VISIBLE
+        b.camerasChip.text = "Cameras ${liveCams.count { it in tiles.keys }}/$n"
+    }
+
     private fun setTileStatus(t: Tile, s: CameraStream.Status, msg: String?) {
         val color = when (s) {
             CameraStream.Status.LIVE -> R.color.live
@@ -456,7 +497,11 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
     }
 
     override fun onCameraStatus(cameraId: String, status: CameraStream.Status, message: String?) {
-        val run = Runnable { tiles[cameraId]?.let { setTileStatus(it, status, message) } }
+        val run = Runnable {
+            if (status == CameraStream.Status.LIVE) liveCams += cameraId else liveCams -= cameraId
+            updateCamerasChip()
+            tiles[cameraId]?.let { setTileStatus(it, status, message) }
+        }
         if (Looper.myLooper() == Looper.getMainLooper()) run.run() else handler.post(run)
     }
 
@@ -558,6 +603,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             box.addView(TextView(this@MainActivity).apply {
                 text = "$title      (tap to close)"
                 setTextColor(0xFFFFFFFF.toInt()); textSize = 18f; setPadding(8, 4, 8, 12)
+            })
+            val plateBmp = withContext(Dispatchers.IO) {
+                com.vehiclegate.anpr.Pictures.plateFile(path)?.let { BitmapFactory.decodeFile(it.absolutePath) }
+            }
+            if (plateBmp != null) box.addView(ImageView(this@MainActivity).apply {
+                setImageBitmap(plateBmp); scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = android.widget.LinearLayout.LayoutParams(-1, (resources.displayMetrics.density * 110).toInt())
+                setPadding(0, 0, 0, 12)
             })
             box.addView(ImageView(this@MainActivity).apply {
                 setImageBitmap(bmp); scaleType = ImageView.ScaleType.FIT_CENTER

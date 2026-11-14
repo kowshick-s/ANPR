@@ -60,7 +60,12 @@ class AnprPipeline(
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: PlateRecognizer? = null
     private val streams = ArrayList<CameraStream>()
-    private var engine: PlateFusionEngine<Bitmap>? = null
+    /** Pictures kept for a read: small scene (plate boxed) + plate crop. */
+    class Snap(val scene: Bitmap, val plate: Bitmap?)
+
+    private var engine: PlateFusionEngine<Snap>? = null
+    /** Stops re-reading plates that stand at the same spot (each read of them gives a new wrong number). */
+    private val stationary = com.vehiclegate.anpr.core.StationaryFilter()
     private var running = false
 
     fun start(cameras: List<CameraConfig>, settings: AppSettings) {
@@ -106,12 +111,19 @@ class AnprPipeline(
             ) {
                 val eng = engine
                 if (!running || eng == null) { frame.recycle(); return }
-                val snapshot = makeSnapshot(frame, candidates)
-                frame.recycle()
-                for (c in candidates) {
-                    eng.submit(PlateRead(camera.id, camera.name, c.plate, c.confidence, timestampMs, snapshot))
+                val fw = frame.width.toFloat().coerceAtLeast(1f)
+                val fh = frame.height.toFloat().coerceAtLeast(1f)
+                val fresh = candidates.filter { c ->
+                    stationary.accept(camera.id, c.box.exactCenterX() / fw, c.box.exactCenterY() / fh, timestampMs)
                 }
-                val top = candidates.first()
+                if (fresh.isEmpty()) { frame.recycle(); return } // plate standing still – not read again
+                val snapshot = makeSnapshot(frame, fresh)
+                frame.recycle()
+                for (c in fresh) {
+                    eng.submit(PlateRead(camera.id, camera.name, c.plate, c.confidence, timestampMs, snapshot,
+                        posX = c.box.exactCenterX() / fw, posY = c.box.exactCenterY() / fh))
+                }
+                val top = fresh.first()
                 main.post { events.onRawRead(camera.id, top.plate.formatted, (top.score * 100).toInt()) }
             }
         }
@@ -123,7 +135,12 @@ class AnprPipeline(
             s.start()
         }
         main.post(ticker)
-        scope.launch(Dispatchers.IO) { cleanup(settings.retentionDays) }
+        scope.launch(Dispatchers.IO) {
+            while (running) {
+                try { cleanup(settings.retentionDays, settings.keepPicturesDays) } catch (_: Exception) {}
+                kotlinx.coroutines.delay(TimeUnit.HOURS.toMillis(6))
+            }
+        }
     }
 
     fun stop() {
@@ -146,9 +163,25 @@ class AnprPipeline(
         }
     }
 
-    /** Snapshot for the TV: ROI frame, ≤ 960 px wide, with the detected plate(s) boxed. */
-    private fun makeSnapshot(frame: Bitmap, candidates: List<PlateRecognizer.Candidate>): Bitmap {
-        val scale = min(1f, 960f / frame.width)
+    /** Small scene picture (≤ 640 px, plate boxed) + crop of the best plate (≤ 360 px). */
+    private fun makeSnapshot(frame: Bitmap, candidates: List<PlateRecognizer.Candidate>): Snap {
+        val plate = try {
+            val b = candidates.first().box
+            val padX = (b.width() * 0.15f).toInt(); val padY = (b.height() * 0.35f).toInt()
+            val r = android.graphics.Rect(b.left - padX, b.top - padY, b.right + padX, b.bottom + padY)
+            if (r.intersect(0, 0, frame.width, frame.height) && r.width() > 8 && r.height() > 4) {
+                val crop = Bitmap.createBitmap(frame, r.left, r.top, r.width(), r.height())
+                val s = min(1f, 360f / crop.width)
+                if (s < 1f) Bitmap.createScaledBitmap(crop, (crop.width * s).toInt().coerceAtLeast(1),
+                    (crop.height * s).toInt().coerceAtLeast(1), true).also { if (it !== crop) crop.recycle() }
+                else crop.copy(Bitmap.Config.ARGB_8888, false).also { if (it !== crop) crop.recycle() }
+            } else null
+        } catch (_: Exception) { null }
+        return Snap(sceneOf(frame, candidates), plate)
+    }
+
+    private fun sceneOf(frame: Bitmap, candidates: List<PlateRecognizer.Candidate>): Bitmap {
+        val scale = min(1f, 640f / frame.width)
         val w = (frame.width * scale).toInt().coerceAtLeast(1)
         val h = (frame.height * scale).toInt().coerceAtLeast(1)
         val scaled = Bitmap.createScaledBitmap(frame, w, h, true)
@@ -157,7 +190,7 @@ class AnprPipeline(
         val canvas = Canvas(out)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 4f
+            strokeWidth = 3f
             color = Color.rgb(0, 230, 118)
         }
         for (c in candidates.take(3)) {
@@ -167,10 +200,10 @@ class AnprPipeline(
         return out
     }
 
-    private fun persist(v: FusedVehicle<Bitmap>, settings: AppSettings) {
+    private fun persist(v: FusedVehicle<Snap>, settings: AppSettings) {
         scope.launch {
             val entry = withContext(Dispatchers.IO) {
-                val path = v.snapshot?.let { saveJpeg(it, v.firstSeenMs, v.compact) }
+                val path = v.snapshot?.let { saveSnap(it, v.firstSeenMs, v.compact, settings.plateCropOnly) }
                 val summary = v.cameraVotes.joinToString("\n") {
                     listOf(it.cameraName.replace("|", "/"), it.bestText, (it.bestScore * 100).toInt(),
                         it.reads, if (it.agreesWithFinal) 1 else 0).joinToString("|")
@@ -188,7 +221,8 @@ class AnprPipeline(
                 )
                 // Parking rules decide: monthly auto check-in/out, waiting list, or ignore.
                 // (The desk keeps or deletes the picture.)
-                app.parking.onDetected(e, app.settingsStore.settings())
+                val pos = v.cameraId?.let { ParkingDesk.Pos(it, v.posX, v.posY) }?.takeIf { it.x >= 0 }
+                app.parking.onDetected(e, app.settingsStore.settings(), pos)
             }
             when (entry) {
                 is ParkingDesk.Result.CheckedIn -> events.onVehicleSaved(entry.entry)
@@ -201,19 +235,39 @@ class AnprPipeline(
 
     private fun snapshotDir() = File(app.filesDir, "snapshots").apply { mkdirs() }
 
-    private fun saveJpeg(bmp: Bitmap, ts: Long, plate: String): String? = try {
+    /**
+     * Saves the scene (quality 70) and the plate crop next to it ("…_plate.jpg", quality 85).
+     * Crop-only mode: just the plate crop at the returned path. About 50 KB per vehicle (crop only ~10 KB).
+     */
+    private fun saveSnap(s: Snap, ts: Long, plate: String, cropOnly: Boolean): String? = try {
         val f = File(snapshotDir(), "${ts}_$plate.jpg")
-        FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        if (cropOnly && s.plate != null) {
+            FileOutputStream(f).use { s.plate.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        } else {
+            FileOutputStream(f).use { s.scene.compress(Bitmap.CompressFormat.JPEG, 70, it) }
+            s.plate?.let { p ->
+                FileOutputStream(File(snapshotDir(), "${ts}_${plate}_plate.jpg")).use { p.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            }
+        }
         f.absolutePath
     } catch (e: Exception) {
         null
     }
 
-    private suspend fun cleanup(retentionDays: Int) {
+    private suspend fun cleanup(retentionDays: Int, keepPicturesDays: Int) {
+        // pictures: kept until check-out + N days (the visit record itself stays)
+        if (keepPicturesDays > 0) {
+            val before = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(keepPicturesDays.toLong())
+            for (e in app.db.entries().picturesToDrop(before)) {
+                Pictures.delete(e.snapshotPath)
+                app.db.entries().update(e.copy(snapshotPath = null))
+            }
+        }
         if (retentionDays <= 0) return
         val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(retentionDays.toLong())
         val dao = app.db.entries()
-        dao.snapshotsBefore(cutoff).filterNotNull().forEach { File(it).delete() }
+        dao.snapshotsBefore(cutoff).filterNotNull().forEach { Pictures.delete(it) }
         dao.deleteBefore(cutoff)
+        app.db.captures().deleteBefore(cutoff)
     }
 }

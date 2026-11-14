@@ -78,6 +78,8 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         fun checkOut(c: Capture, parked: VehicleEntry)
         fun ignore(c: Capture)
         fun photo(c: Capture)
+        /** Long-press: "same vehicle as …" to join two cards. */
+        fun mergeMenu(c: Capture, anchor: View)
     }
 
     var expandedId: Long? = null
@@ -101,6 +103,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         val alts: TextView = v.findViewById(R.id.alts)
         val time: TextView = v.findViewById(R.id.time)
         val badge: TextView = v.findViewById(R.id.badge)
+        val chevron: ImageView = v.findViewById(R.id.chevron)
         val editor: View = v.findViewById(R.id.editor)
         val chips: LinearLayout = v.findViewById(R.id.chips)
         val editPlate: EditText = v.findViewById(R.id.editPlate)
@@ -174,20 +177,23 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         if (manual) {
             h.thumb.visibility = View.GONE
             h.plate.text = "Manual check-in"
-            h.alts.text = "For vehicles the cameras can't see (e.g. parked outside)"
+            h.alts.text = "vehicles the cameras can't see"
             h.time.text = ""
         } else {
             h.thumb.visibility = View.VISIBLE
-            host.loadThumb(c.snapshotPath, h.thumb)
+            host.loadThumb(com.vehiclegate.anpr.Pictures.thumbPath(c.snapshotPath), h.thumb)
             h.plate.text = c.plateFormatted
             val others = readings.filter { it.compact != c.plate }.map { it.formatted }
-            h.alts.text = if (others.isEmpty()) "Read ${c.reads}×" else "Also read: " + others.joinToString(" · ")
-            h.time.text = "${shortTime(c.firstSeen)}\n${c.reads} reads"
+            h.alts.text = if (others.isEmpty()) "" else "also " + others.joinToString(" · ")
+            h.time.text = "${shortTime(c.firstSeen)} · ${c.reads}×"
         }
         val parked = if (manual) null else host.parkedFor(c)
         h.badge.visibility = if (parked != null) View.VISIBLE else View.GONE
         if (parked != null) h.badge.text = "Parked · leaving?"
         h.head.setOnClickListener { if (!manual) expand(if (expandedId == c.id) null else c.id) }
+        h.head.setOnLongClickListener { if (!manual) host.mergeMenu(c, h.head); !manual }
+        h.chevron.rotation = if (open) 180f else 0f
+        h.chevron.visibility = if (manual) View.GONE else View.VISIBLE
 
         h.editor.visibility = if (open) View.VISIBLE else View.GONE
         if (!open) { h.editorFor = null; return }
@@ -241,13 +247,27 @@ class CheckInAdapter(
     private val amountFor: (VehicleEntry) -> Int,
     private val onCheckOut: (VehicleEntry) -> Unit,
     private val onPhoto: (VehicleEntry) -> Unit,
-    private val onLongClick: (VehicleEntry) -> Unit
+    private val onLongClick: (VehicleEntry) -> Unit,
+    private val loadThumb: (String?, ImageView) -> Unit
 ) : ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
     init { setHasStableIds(true) }
 
+    private var expandedId: Long? = null
+
+    private fun toggle(id: Long) {
+        val old = expandedId
+        expandedId = if (old == id) null else id
+        currentList.indexOfFirst { it.id == old }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+        if (expandedId != null) currentList.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+    }
+
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val mark: View = v.findViewById(R.id.mark)
+        val plateText: TextView = v.findViewById(R.id.plateText)
+        val chevron: ImageView = v.findViewById(R.id.chevron)
+        val more: View = v.findViewById(R.id.more)
+        val plateThumb: ImageView = v.findViewById(R.id.plateThumb)
         val plate: EditText = v.findViewById(R.id.plate)
         val name: EditText = v.findViewById(R.id.name)
         val model: AutoCompleteTextView = v.findViewById(R.id.model)
@@ -259,7 +279,7 @@ class CheckInAdapter(
         val disarm = Runnable { armedUntil = 0; entry?.let { setOutText(it) } }
 
         fun setOutText(e: VehicleEntry) {
-            out.text = if (e.isMonthly) "Check out" else "Check out ₹${amountFor(e)}"
+            out.text = if (e.isMonthly) "Out" else "Out ₹${amountFor(e)}"
         }
 
         init {
@@ -296,7 +316,7 @@ class CheckInAdapter(
                     onCheckOut(e)
                 } else {
                     armedUntil = now + 4000
-                    out.text = if (e.isMonthly) "Tap again" else "Collect ₹${amountFor(e)} · tap again"
+                    out.text = if (e.isMonthly) "Tap again" else "₹${amountFor(e)} · tap again"
                     out.removeCallbacks(disarm); out.postDelayed(disarm, 4000)
                 }
             }
@@ -314,13 +334,25 @@ class CheckInAdapter(
         h.entry = e
         h.mark.setBackgroundColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly else R.color.checkin))
         // never overwrite what the user is typing
-        if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
-        h.plate.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
+        h.plateText.text = e.plateFormatted
+        h.plateText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text))
+        val open = e.id == expandedId
+        h.more.visibility = if (open) View.VISIBLE else View.GONE
+        h.chevron.rotation = if (open) 180f else 0f
+        h.chevron.setOnClickListener { toggle(e.id) }
+        h.plateText.setOnClickListener { toggle(e.id) }
+        h.plateText.setOnLongClickListener { onLongClick(e); true }
+        if (open) {
+            if (!h.plate.hasFocus()) h.plate.setText(e.plateFormatted)
+            loadThumb(com.vehiclegate.anpr.Pictures.plateFile(e.snapshotPath)?.absolutePath, h.plateThumb)
+            h.plateThumb.visibility = if (com.vehiclegate.anpr.Pictures.plateFile(e.snapshotPath) != null) View.VISIBLE else View.GONE
+            h.plateThumb.setOnClickListener { onPhoto(e) }
+        }
         if (!h.name.hasFocus()) h.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
         if (!h.model.hasFocus()) h.model.setText(e.model ?: "", false)
         if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
         val now = System.currentTimeMillis()
-        h.whenText.text = "In ${shortTime(e.entryTime)}\n${ParkingFee.duration(e.entryTime, now)}" +
+        h.whenText.text = "${shortTime(e.entryTime)}\n${ParkingFee.duration(e.entryTime, now)}" +
             (if (e.isMonthly) " · MONTHLY" else "") +
             (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
         h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))

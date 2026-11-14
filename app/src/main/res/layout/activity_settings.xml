@@ -146,6 +146,16 @@
                 <RadioButton android:id="@+id/themeDark" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dark" />
             </RadioGroup>
 
+            <CheckBox
+                android:id="@+id/plateCropOnly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Save only the plate crop (≈10 KB) – no small scene picture (≈50 KB with it)" />
+
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delete pictures this many days after check-out (0 = keep; the visit record always stays)" />
+            <EditText android:id="@+id/keepPicturesDays" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
             <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site / gate name)" />
             <EditText android:id="@+id/siteTitle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
 

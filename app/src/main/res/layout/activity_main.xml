@@ -14,12 +14,12 @@
         android:background="@color/surface"
         android:elevation="2dp"
         android:gravity="center_vertical"
-        android:minHeight="64dp"
+        android:minHeight="52dp"
         android:orientation="horizontal"
         android:paddingStart="20dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="4dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="4dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -36,7 +36,7 @@
                 android:singleLine="true"
                 android:text="Vehicle Entry Monitor"
                 android:textColor="@color/text"
-                android:textSize="20sp" />
+                android:textSize="18sp" />
 
             <TextView
                 android:id="@+id/clock"
@@ -46,8 +46,28 @@
                 android:fontFeatureSettings="tnum"
                 android:text="--"
                 android:textColor="@color/text_dim"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/camerasChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/chip_bg"
+            android:clickable="true"
+            android:drawableStart="@drawable/ic_videocam"
+            android:drawablePadding="6dp"
+            android:focusable="true"
+            android:fontFamily="@font/inter_medium"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="Cameras"
+            android:textColor="@color/text"
+            android:textSize="13sp" />
 
         <TextView
             android:id="@+id/todayCount"
@@ -57,9 +77,9 @@
             android:background="@drawable/chip_accent_bg"
             android:fontFamily="@font/inter_semibold"
             android:paddingStart="14dp"
-            android:paddingTop="7dp"
+            android:paddingTop="6dp"
             android:paddingEnd="14dp"
-            android:paddingBottom="7dp"
+            android:paddingBottom="6dp"
             android:text="In today: 0"
             android:textColor="@color/accent"
             android:textSize="14sp" />
@@ -72,9 +92,9 @@
             android:background="@drawable/chip_checkin_bg"
             android:fontFamily="@font/inter_semibold"
             android:paddingStart="14dp"
-            android:paddingTop="7dp"
+            android:paddingTop="6dp"
             android:paddingEnd="14dp"
-            android:paddingBottom="7dp"
+            android:paddingBottom="6dp"
             android:text="Out: 0 · ₹0"
             android:textColor="@color/checkin"
             android:textSize="14sp" />
@@ -101,15 +121,15 @@
         android:layout_weight="1"
         android:baselineAligned="false"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="16dp">
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp">
 
         <!-- CAPTURED -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="10dp"
             android:layout_weight="1"
             android:background="@drawable/card_bg"
             android:orientation="vertical">
@@ -118,12 +138,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:minHeight="60dp"
+                android:minHeight="48dp"
                 android:orientation="horizontal"
                 android:paddingStart="16dp"
-                android:paddingTop="8dp"
-                android:paddingEnd="12dp"
-                android:paddingBottom="8dp">
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp">
 
                 <ImageView
                     android:layout_width="10dp"
@@ -178,10 +198,10 @@
                 android:layout_weight="1"
                 android:clipToPadding="false"
                 android:descendantFocusability="afterDescendants"
-                android:paddingStart="10dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="10dp" />
+                android:paddingStart="6dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="6dp" />
         </LinearLayout>
 
         <!-- PARKED / CHECKED OUT -->
@@ -196,12 +216,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:minHeight="60dp"
+                android:minHeight="48dp"
                 android:orientation="horizontal"
                 android:paddingStart="10dp"
-                android:paddingTop="8dp"
-                android:paddingEnd="12dp"
-                android:paddingBottom="8dp">
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp">
 
                 <TextView
                     android:id="@+id/tabParked"
@@ -217,7 +237,7 @@
                     android:paddingBottom="8dp"
                     android:text="Parked"
                     android:textColor="@color/tab_text"
-                    android:textSize="15sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tabOut"
@@ -288,10 +308,10 @@
                 android:layout_weight="1"
                 android:clipToPadding="false"
                 android:descendantFocusability="afterDescendants"
-                android:paddingStart="10dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="8dp" />
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="6dp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/outList"
@@ -299,10 +319,10 @@
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:clipToPadding="false"
-                android:paddingStart="10dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="8dp"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="6dp"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
@@ -311,9 +331,10 @@
         android:id="@+id/lastEvent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="20dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="4dp"
         android:ellipsize="end"
         android:singleLine="true"
         android:textColor="@color/text_dim"
@@ -327,6 +348,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="8dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="14dp"
-        android:orientation="horizontal" />
+        android:layout_marginBottom="10dp"
+        android:orientation="horizontal"
+        android:visibility="gone" />
 </LinearLayout>

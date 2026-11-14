@@ -12,7 +12,6 @@ import com.vehiclegate.anpr.data.EntryStatus
 import com.vehiclegate.anpr.data.MonthlyMember
 import com.vehiclegate.anpr.data.PlateFix
 import com.vehiclegate.anpr.data.VehicleEntry
-import java.io.File
 import kotlin.math.max
 
 /**
@@ -28,6 +27,9 @@ import kotlin.math.max
  * way without a capture.
  */
 class ParkingDesk(private val app: AnprApp) {
+
+    /** Camera + plate position (0..1) of a read. */
+    data class Pos(val camId: String, val x: Float, val y: Float)
 
     sealed class Result {
         /** Monthly user checked in automatically */
@@ -76,7 +78,7 @@ class ParkingDesk(private val app: AnprApp) {
     // ------------------------------------------------------------------ camera reads
 
     /** [read] is a vehicle the cameras decided on (entryTime = first seen). */
-    suspend fun onDetected(read: VehicleEntry, s: AppSettings): Result {
+    suspend fun onDetected(read: VehicleEntry, s: AppSettings, pos: Pos? = null): Result {
         val fix = app.db.fixes().get(read.plate)
         val d = if (fix != null) read.copy(plate = fix.correct, plateFormatted = fix.correctFormatted) else read
         expireStale(d.entryTime)
@@ -85,7 +87,7 @@ class ParkingDesk(private val app: AnprApp) {
         if (member != null) {
             return monthly(d.copy(plate = member.plate, plateFormatted = formatted(member.plate)), member, s)
         }
-        return addCapture(d)
+        return addCapture(d, pos)
     }
 
     /** Monthly user: check in, or (already in) check out. Seen again within the minimum stay = still at the gate. */
@@ -95,17 +97,17 @@ class ParkingDesk(private val app: AnprApp) {
         val open = dao.openSessions().firstOrNull { it.plate == d.plate }
         if (open != null) {
             if (t - open.entryTime < minStayMs) {
-                d.snapshotPath?.let { File(it).delete() }
+                d.snapshotPath?.let { Pictures.delete(it) }
                 return Result.Ignored(open.plateFormatted, "monthly user still at the gate")
             }
             val out = open.copy(status = EntryStatus.OUT, exitDetectedAt = t, exitTime = t, amount = 0, monthly = true)
             dao.update(out)
-            d.snapshotPath?.let { File(it).delete() }
+            d.snapshotPath?.let { Pictures.delete(it) }
             return Result.AutoCheckedOut(out)
         }
         val recentlyOut = dao.closedSince(t - minStayMs).firstOrNull { it.plate == d.plate }
         if (recentlyOut != null) {
-            d.snapshotPath?.let { File(it).delete() }
+            d.snapshotPath?.let { Pictures.delete(it) }
             return Result.Ignored(recentlyOut.plateFormatted, "monthly user just left")
         }
         val (_, model) = previousDetails(d.plate)
@@ -115,31 +117,42 @@ class ParkingDesk(private val app: AnprApp) {
     }
 
     /** Daily vehicle: merge into a waiting card of the same vehicle, or start a new card. */
-    private suspend fun addCapture(d: VehicleEntry): Result {
+    private suspend fun addCapture(d: VehicleEntry, pos: Pos?): Result {
         val r = Reading(d.plate, d.plateFormatted, d.confidence * max(1, d.totalReads), max(1, d.totalReads))
-        val match = cdao.pendingSince(d.entryTime - MERGE_WINDOW_MS).firstOrNull { c ->
-            CaptureLogic.decode(c.readings).any { CaptureLogic.similar(it.compact, d.plate) }
+        val t = d.entryTime
+        val match = cdao.pendingSince(t - MERGE_WINDOW_MS).firstOrNull { c ->
+            val rs = CaptureLogic.decode(c.readings)
+            // nearly the same text (≤2 characters / same 4-digit number) within 3 min
+            rs.any { CaptureLogic.similar(it.compact, d.plate) } ||
+                // shifted / partial read (3 digits in a row shared) within 1 min
+                (t - c.lastSeen <= RELATED_WINDOW_MS && rs.any { CaptureLogic.related(it.compact, d.plate) }) ||
+                // same camera, plate at the same spot within 30 s
+                (pos != null && c.camId == pos.camId && c.posX != null && c.posY != null &&
+                    kotlin.math.abs(c.posX - pos.x) < SAME_SPOT && kotlin.math.abs(c.posY - pos.y) < SAME_SPOT &&
+                    t - c.lastSeen <= SAME_SPOT_WINDOW_MS)
         }
         if (match == null) {
             val c = Capture(
                 plate = d.plate, plateFormatted = d.plateFormatted,
                 firstSeen = d.entryTime, lastSeen = d.lastSeenTime, reads = r.count,
                 readings = CaptureLogic.encode(listOf(r)), snapshotPath = d.snapshotPath,
-                confidence = d.confidence, cameraSummary = d.cameraSummary
+                confidence = d.confidence, cameraSummary = d.cameraSummary,
+                camId = pos?.camId, posX = pos?.x, posY = pos?.y
             )
             return Result.Captured(c.copy(id = cdao.insert(c)), true)
         }
         val readings = CaptureLogic.merge(CaptureLogic.decode(match.readings), r)
         val best = readings.first()
         val betterPicture = d.snapshotPath != null && (match.snapshotPath == null || d.confidence > match.confidence)
-        if (betterPicture) match.snapshotPath?.let { File(it).delete() } else d.snapshotPath?.let { File(it).delete() }
+        if (betterPicture) match.snapshotPath?.let { Pictures.delete(it) } else d.snapshotPath?.let { Pictures.delete(it) }
         val c = match.copy(
             plate = best.compact, plateFormatted = best.formatted,
             lastSeen = max(match.lastSeen, d.lastSeenTime), reads = match.reads + r.count,
             readings = CaptureLogic.encode(readings),
             snapshotPath = if (betterPicture) d.snapshotPath else match.snapshotPath,
             confidence = max(match.confidence, d.confidence),
-            cameraSummary = if (betterPicture) d.cameraSummary else match.cameraSummary
+            cameraSummary = if (betterPicture) d.cameraSummary else match.cameraSummary,
+            camId = pos?.camId ?: match.camId, posX = pos?.x ?: match.posX, posY = pos?.y ?: match.posY
         )
         cdao.update(c)
         return Result.Captured(c, false)
@@ -148,7 +161,7 @@ class ParkingDesk(private val app: AnprApp) {
     /** Cards nobody handled for [EXPIRE_MS] disappear (pictures deleted). */
     private suspend fun expireStale(now: Long) {
         for (c in cdao.stale(now - EXPIRE_MS)) {
-            c.snapshotPath?.let { File(it).delete() }
+            c.snapshotPath?.let { Pictures.delete(it) }
             cdao.update(c.copy(status = CaptureStatus.EXPIRED, snapshotPath = null))
         }
     }
@@ -197,8 +210,40 @@ class ParkingDesk(private val app: AnprApp) {
         if (c != null) {
             cdao.update(c.copy(status = CaptureStatus.DONE))
             rememberCorrections(c, saved.plate, saved.plateFormatted)
+            closeSiblings(c, saved.plate)
         }
         return saved to null
+    }
+
+    /** Other waiting cards from the same minute that are clearly the same vehicle disappear. */
+    private suspend fun closeSiblings(c: Capture, compact: String): Int {
+        val near = cdao.pendingBetween(c.firstSeen - SIBLING_MS, c.lastSeen + SIBLING_MS, c.id)
+        var n = 0
+        for (o in near) {
+            val rs = CaptureLogic.decode(o.readings)
+            if (rs.any { CaptureLogic.similar(it.compact, compact) || CaptureLogic.related(it.compact, compact) }) {
+                ignore(o); n++
+            }
+        }
+        return n
+    }
+
+    /** Staff: "these two cards are the same vehicle" – [from] is merged into [into]. */
+    suspend fun merge(into: Capture, from: Capture): Capture {
+        var readings = CaptureLogic.decode(into.readings)
+        for (r in CaptureLogic.decode(from.readings)) readings = CaptureLogic.merge(readings, r)
+        val best = readings.first()
+        val keepFrom = into.snapshotPath == null && from.snapshotPath != null
+        val c = into.copy(
+            plate = best.compact, plateFormatted = best.formatted,
+            firstSeen = minOf(into.firstSeen, from.firstSeen), lastSeen = maxOf(into.lastSeen, from.lastSeen),
+            reads = into.reads + from.reads, readings = CaptureLogic.encode(readings),
+            snapshotPath = if (keepFrom) from.snapshotPath else into.snapshotPath,
+            confidence = maxOf(into.confidence, from.confidence)
+        )
+        cdao.update(c)
+        if (keepFrom) cdao.update(from.copy(status = CaptureStatus.IGNORED, snapshotPath = null)) else ignore(from)
+        return c
     }
 
     /** Wrong readings on the card are fixed automatically next time. */
@@ -213,7 +258,7 @@ class ParkingDesk(private val app: AnprApp) {
 
     /** Card is junk / not a vehicle to check in. */
     suspend fun ignore(c: Capture) {
-        c.snapshotPath?.let { File(it).delete() }
+        c.snapshotPath?.let { Pictures.delete(it) }
         cdao.update(c.copy(status = CaptureStatus.IGNORED, snapshotPath = null))
     }
 
@@ -303,5 +348,10 @@ class ParkingDesk(private val app: AnprApp) {
         private const val MERGE_WINDOW_MS = 3 * 60_000L
         /** Unhandled cards disappear after this. */
         private const val EXPIRE_MS = 45 * 60_000L
+        private const val RELATED_WINDOW_MS = 60_000L
+        private const val SAME_SPOT_WINDOW_MS = 30_000L
+        private const val SAME_SPOT = 0.06f
+        /** Cards this close in time to a checked-in card may be closed with it. */
+        private const val SIBLING_MS = 90_000L
     }
 }

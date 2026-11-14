@@ -195,4 +195,18 @@ class AnprCoreTest {
         assertEquals(2, CaptureLogic.rank("rav", "TN09AB1212", "Ravi", null))
         assertNull(CaptureLogic.rank("xyz", "TN09AB1212", "Ravi", "Activa"))
     }
+
+    @Test
+    fun shiftedReadsAreRelatedAndStandingPlatesStopBeingRead() {
+        assertTrue(CaptureLogic.related("TN21A0597", "TN24U5973"))   // shares "597"
+        assertTrue(!CaptureLogic.related("TN21A0597", "TN09AB1234"))
+        val f = StationaryFilter(maxStandMs = 10_000, breakMs = 5_000, radius = 0.05f)
+        assertTrue(f.accept("cam1", 0.5f, 0.5f, 0))
+        assertTrue(f.accept("cam1", 0.51f, 0.5f, 4_000))
+        assertTrue(f.accept("cam1", 0.5f, 0.51f, 8_000))
+        assertTrue(!f.accept("cam1", 0.5f, 0.5f, 12_000))           // standing > 10 s
+        assertTrue(f.accept("cam1", 0.2f, 0.5f, 12_500))            // elsewhere = other vehicle
+        assertTrue(f.accept("cam2", 0.5f, 0.5f, 12_500))            // other camera
+        assertTrue(f.accept("cam1", 0.5f, 0.5f, 30_000))            // left and a new one stopped
+    }
 }
