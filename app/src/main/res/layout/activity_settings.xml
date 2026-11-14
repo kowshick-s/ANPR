@@ -7,7 +7,7 @@
     android:orientation="horizontal">
 
     <LinearLayout
-        android:layout_width="260dp"
+        android:layout_width="280dp"
         android:layout_height="match_parent"
         android:background="@color/surface"
         android:orientation="vertical">
@@ -66,11 +66,13 @@
 
             <TextView
                 android:id="@+id/paneTitle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
                 android:fontFamily="@font/inter_semibold"
                 android:textColor="@color/text"
-                android:textSize="22sp" />
+                android:textSize="20sp" />
             <TextView
                 android:id="@+id/paneSummary"
                 android:layout_width="match_parent"
@@ -119,11 +121,11 @@
             </LinearLayout>
 </LinearLayout>
 <LinearLayout android:id="@+id/secParking" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Parking fee (₹) for every started period" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Fee (₹) for every started period" />
 <EditText android:id="@+id/feeAmount" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Period (hours) – e.g. 24 = ₹ per day; 25 h parked = 2 periods" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Period (hours) – 24 = per day" />
 <EditText android:id="@+id/feePeriodHours" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Monthly users: seen again within (minutes) = still at the gate, not leaving" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Monthly users: still at the gate if seen again within (minutes)" />
 <EditText android:id="@+id/minStayMinutes" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
 </LinearLayout>
 <LinearLayout android:id="@+id/secMonthly" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
@@ -155,8 +157,9 @@
                 android:layout_marginTop="6dp"
                 android:background="@drawable/row_bg"
                 android:padding="6dp"
-                android:text="Use AI plate detector + AI plate reader (recommended). Off = classic plate finder only – for comparing"
+                android:text="Use the AI plate detector and reader"
                 android:textColor="@color/text" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="Recommended. Turn off only to compare with the classic plate finder." android:textColor="@color/text_dim" android:textSize="12sp" />
 <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Common state codes at this site. Telangana = TS and TG" />
 <EditText android:id="@+id/commonStates" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapCharacters" />
 <CheckBox
@@ -166,16 +169,18 @@
                 android:layout_marginTop="6dp"
                 android:background="@drawable/row_bg"
                 android:padding="6dp"
-                android:text="Accept ONLY these states, and only full plates (2-digit district + 4-digit number). Recommended – rejects misreads like CH 8 A 06"
+                android:text="Accept only these states and full numbers"
                 android:textColor="@color/text" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="2-digit district and 4-digit number. Rejects misreads like CH 8 A 06." android:textColor="@color/text_dim" android:textSize="12sp" />
 <CheckBox
                 android:id="@+id/movingOnly"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/row_bg"
                 android:padding="6dp"
-                android:text="Log only MOVING vehicles (being ridden/driven in) – ignore parked vehicles"
+                android:text="Log only moving vehicles"
                 android:textColor="@color/text" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="Parked vehicles in view are ignored." android:textColor="@color/text_dim" android:textSize="12sp" />
 <CheckBox
                 android:id="@+id/beep"
                 android:layout_width="wrap_content"
@@ -183,18 +188,18 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/row_bg"
                 android:padding="6dp"
-                android:text="Beep when a new vehicle is logged"
+                android:text="Beep when a vehicle is captured"
                 android:textColor="@color/text" />
 <TextView android:id="@+id/advancedToggle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:background="@drawable/row_bg" android:clickable="true" android:drawableEnd="@drawable/ic_expand" android:drawablePadding="6dp" android:focusable="true" android:fontFamily="@font/inter_semibold" android:gravity="center_vertical" android:padding="6dp" android:text="Advanced" android:textColor="@color/accent" android:textSize="14sp" />
 <LinearLayout android:id="@+id/advancedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="4dp" android:text="Change these only if detection misbehaves." android:textColor="@color/text_dim" android:textSize="13sp" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Re-entry cooldown (seconds) – same vehicle within this time is not logged again" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Re-entry cooldown (seconds)" />
 <EditText android:id="@+id/cooldown" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
 <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minimum reads to accept a vehicle (across all cameras)" />
 <EditText android:id="@+id/minReads" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Decision delay (ms) – wait this long after the last read before deciding" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Decision delay (ms)" />
 <EditText android:id="@+id/settle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="OCR interval per camera (ms) while motion is present" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reading interval per camera (ms)" />
 <EditText android:id="@+id/ocrInterval" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
 <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minimum confidence (%)" />
 <EditText android:id="@+id/minConf" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
@@ -206,20 +211,20 @@
                 android:id="@+id/themeGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <RadioButton android:id="@+id/themeSystem" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Same as device" />
-                <RadioButton android:id="@+id/themeLight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Light" />
+                android:orientation="vertical">
+                <RadioButton android:id="@+id/themeSystem" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Same as device" />
+                <RadioButton android:id="@+id/themeLight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Light" />
                 <RadioButton android:id="@+id/themeDark" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dark" />
             </RadioGroup>
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site / gate name)" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen title (site or gate name)" />
 <EditText android:id="@+id/siteTitle" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Voice input – language the staff speak" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Voice input language" />
 <RadioGroup
                 android:id="@+id/voiceGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <RadioButton android:id="@+id/voiceTamil" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Tamil + English (mixed)" />
+                android:orientation="vertical">
+                <RadioButton android:id="@+id/voiceTamil" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tamil + English (mixed)" />
                 <RadioButton android:id="@+id/voiceEnglish" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="English only" />
             </RadioGroup>
 <CheckBox
@@ -228,8 +233,9 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/row_bg"
                 android:padding="6dp"
-                android:text="Show live camera video on the dashboard (off = small status chips; use ▶ Preview to watch a camera)"
+                android:text="Show live camera video on the counter"
                 android:textColor="@color/text" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="Off = small status chips. Use Preview to watch one camera." android:textColor="@color/text_dim" android:textSize="12sp" />
 </LinearLayout>
 <LinearLayout android:id="@+id/secPictures" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
 <CheckBox
@@ -237,8 +243,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Save only the plate crop (≈10 KB) – no small scene picture (≈50 KB with it)" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delete pictures this many days after check-out (0 = keep; the visit record always stays)" />
+                android:text="Save only the plate picture" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="About 10 KB per vehicle instead of about 50 KB with the small scene picture." android:textColor="@color/text_dim" android:textSize="12sp" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delete pictures after check-out (days, 0 = keep)" />
 <EditText android:id="@+id/keepPicturesDays" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
 <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keep history for (days, 0 = forever)" />
 <EditText android:id="@+id/retention" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
@@ -263,9 +270,9 @@
 <TextView style="@style/SectionTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Email backup" />
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="4dp" android:text="Every hour (only if something changed): a printable PDF of all parked vehicles and today&#39;s CSV. If the app or phone fails, print the last email and continue on paper. Needs a Gmail app password: Google Account → Security → 2-Step Verification on → App passwords." android:textColor="@color/text_dim" android:textSize="13sp" />
 <CheckBox android:id="@+id/backupEnabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Send the hourly backup email" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Your Gmail (sends and receives the backup)" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Your Gmail (sends and receives)" />
 <EditText android:id="@+id/backupGmail" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textEmailAddress" android:hint="name@gmail.com" />
-<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gmail app password (16 letters – not your normal password)" />
+<TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gmail app password (16 letters)" />
 <EditText android:id="@+id/backupPassword" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textPassword" />
 <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Also send to (optional, comma separated)" />
 <EditText android:id="@+id/backupAlsoTo" style="@style/Field" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textEmailAddress" />
@@ -296,7 +303,8 @@
 <TextView android:id="@+id/protectStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="@color/text_dim" android:textSize="13sp" />
 <androidx.appcompat.widget.AppCompatButton android:id="@+id/protectAdmin" style="@style/TvButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" />
 <CheckBox android:id="@+id/protectKiosk" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp"
-                android:text="Kiosk mode: block uninstall, keep this device locked to the app, open it after a restart" />
+                android:text="Kiosk mode" />
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="48dp" android:layout_marginBottom="6dp" android:text="Blocks uninstall, keeps the device in the app and opens it after a restart." android:textColor="@color/text_dim" android:textSize="12sp" />
 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:fontFamily="@font/inter_semibold" android:text="Danger zone" android:textColor="@color/error" android:textSize="14sp" />
 <androidx.appcompat.widget.AppCompatButton android:id="@+id/protectRelease" style="@style/TvButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
                 android:text="Release this device (allow uninstall again)" android:textColor="@color/error" />

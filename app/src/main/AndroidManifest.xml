@@ -54,6 +54,7 @@
 
         <activity
             android:name=".ui.UsersActivity"
+            android:screenOrientation="sensorLandscape"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
@@ -79,11 +80,13 @@
 
         <activity
             android:name=".ui.MonthlyUsersActivity"
+            android:screenOrientation="sensorLandscape"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.SettingsActivity"
+            android:screenOrientation="sensorLandscape"
             android:exported="false"
             android:label="@string/settings"
             android:windowSoftInputMode="adjustResize" />
