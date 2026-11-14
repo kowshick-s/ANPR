@@ -282,16 +282,25 @@ class ParkingDesk(private val app: AnprApp) {
     suspend fun undoCheckOut(e: VehicleEntry) =
         dao.update(e.copy(status = EntryStatus.IN, exitTime = null, exitDetectedAt = null, amount = null))
 
-    /** Last Token/Name and model typed for this plate (or for a plate one character different). */
+    /**
+     * Last *name* and model typed for this plate (or a plate one character different).
+     * Token numbers are never reused – they change every day with the queue.
+     */
     suspend fun previousDetails(plate: String): Pair<String, String> {
-        var name = dao.lastNameFor(plate)
+        var name = dao.namesFor(plate).firstOrNull { !isToken(it) }
         var model = dao.lastModelFor(plate)
         if (name == null || model == null) {
             val near = dao.recentWithDetails().filter { same(it.plate, plate) }
-            if (name == null) name = near.firstOrNull { !it.name.isNullOrBlank() }?.name
+            if (name == null) name = near.firstOrNull { !it.name.isNullOrBlank() && !isToken(it.name) }?.name
             if (model == null) model = near.firstOrNull { !it.model.isNullOrBlank() }?.model
         }
         return (name ?: "") to (model ?: "")
+    }
+
+    /** A token number (e.g. "29", "A12") rather than a name. */
+    fun isToken(s: String): Boolean {
+        val t = s.trim()
+        return t.isNotEmpty() && (t.all { it.isDigit() } || (t.length <= 4 && t.any { it.isDigit() }))
     }
 
     /**

@@ -117,17 +117,28 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         /** Capture the editor fields were filled for (so rebinding never wipes what is being typed). */
         var editorFor: Long? = null
         var parked: VehicleEntry? = null
+        /** The parked vehicle this card matches (from any of its readings). */
+        var cardParked: VehicleEntry? = null
+        /** Staff changed the number (typed or picked a reading). */
+        var userEdited = false
         private val lookupNow = Runnable { runLookup() }
 
         init {
             afterChange(editPlate) {
-                if (editPlate.hasFocus()) { editPlate.removeCallbacks(lookupNow); editPlate.postDelayed(lookupNow, 500) }
+                if (editPlate.hasFocus()) {
+                    userEdited = true
+                    editPlate.removeCallbacks(lookupNow); editPlate.postDelayed(lookupNow, 500)
+                }
             }
+            // Check in / Out ₹ is on the row itself: one tap. With the editor open it uses the edited fields.
             confirm.setOnClickListener {
                 val c = capture ?: return@setOnClickListener
                 val p = parked
-                if (p != null) host.checkOut(c, p)
-                else host.checkIn(c, editPlate.text.toString(), editName.text.toString(), editModel.text.toString())
+                when {
+                    p != null -> host.checkOut(c, p)
+                    editorFor == c.id -> host.checkIn(c, editPlate.text.toString(), editName.text.toString(), editModel.text.toString())
+                    else -> host.checkIn(c, c.plateFormatted, "", "")
+                }
             }
             ignore.setOnClickListener { capture?.let { host.ignore(it) } }
             thumb.setOnClickListener { capture?.let { host.photo(it) } }
@@ -139,8 +150,16 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             val forId = c.id
             host.lookup(c, typed) { text, hint ->
                 if (capture?.id != forId) return@lookup
-                editHint.text = text
-                showParked((hint as? ParkingDesk.Hint.Parked)?.entry)
+                val cp = cardParked
+                when {
+                    hint is ParkingDesk.Hint.Parked -> { editHint.text = text; showParked(hint.entry) }
+                    !userEdited && cp != null -> {
+                        // the best reading is wrong but another reading matches a parked vehicle
+                        editHint.text = "Same vehicle as parked ${cp.plateFormatted} (${cp.whoText()}) – leaving"
+                        showParked(cp)
+                    }
+                    else -> { editHint.text = text; showParked(null) }
+                }
                 if (hint is ParkingDesk.Hint.Regular) {
                     if (editName.text.isNullOrBlank() && !editName.hasFocus()) editName.setText(hint.name)
                     if (editModel.text.isNullOrBlank() && !editModel.hasFocus()) editModel.setText(hint.model, false)
@@ -152,7 +171,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             parked = p
             val ctx = itemView.context
             if (p != null) {
-                confirm.text = if (p.isMonthly) "Check out" else "Check out ₹${host.amountFor(p)}"
+                confirm.text = if (p.isMonthly) "Out" else "Out ₹${host.amountFor(p)}"
                 confirm.setBackgroundResource(R.drawable.btn_checkout_bg)
                 confirm.setTextColor(ContextCompat.getColor(ctx, R.color.on_checkout))
             } else {
@@ -188,31 +207,34 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             h.time.text = "${shortTime(c.firstSeen)} · ${c.reads}×"
         }
         val parked = if (manual) null else host.parkedFor(c)
+        h.cardParked = parked
         h.badge.visibility = if (parked != null) View.VISIBLE else View.GONE
         if (parked != null) h.badge.text = "Parked · leaving?"
+        if (h.editorFor != c.id || !h.userEdited) h.showParked(parked)
         h.head.setOnClickListener { if (!manual) expand(if (expandedId == c.id) null else c.id) }
         h.head.setOnLongClickListener { if (!manual) host.mergeMenu(c, h.head); !manual }
         h.chevron.rotation = if (open) 180f else 0f
         h.chevron.visibility = if (manual) View.GONE else View.VISIBLE
 
         h.editor.visibility = if (open) View.VISIBLE else View.GONE
-        if (!open) { h.editorFor = null; return }
+        if (!open) { h.editorFor = null; h.userEdited = false; return }
 
         if (h.editorFor != c.id) {
             h.editorFor = c.id
+            h.userEdited = false
             h.editPlate.setText(if (manual) "" else c.plateFormatted)
             h.editName.setText("")
             h.editModel.setText("", false)
             h.editHint.text = if (manual) "Type the number – regulars and monthly users are recognised" else ""
             h.ignore.text = if (manual) "Cancel" else "Ignore"
             if (h.editModel.adapter == null) host.modelSuggestions()?.let { h.editModel.setAdapter(it) }
-            h.showParked(parked)
             // other readings as chips: tap = use that number
             h.chips.removeAllViews()
             if (!manual && readings.size > 1) for (r in readings) {
                 val chip = LayoutInflater.from(h.itemView.context).inflate(R.layout.item_chip, h.chips, false) as TextView
                 chip.text = r.formatted
                 chip.setOnClickListener {
+                    h.userEdited = true
                     h.editPlate.setText(r.formatted)
                     h.runLookup()
                 }
@@ -352,7 +374,7 @@ class CheckInAdapter(
         if (!h.model.hasFocus()) h.model.setText(e.model ?: "", false)
         if (h.model.adapter == null) modelSuggestions()?.let { h.model.setAdapter(it) }
         val now = System.currentTimeMillis()
-        h.whenText.text = "${shortTime(e.entryTime)}\n${ParkingFee.duration(e.entryTime, now)}" +
+        h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))}\n${ParkingFee.duration(e.entryTime, now)} parked" +
             (if (e.isMonthly) " · MONTHLY" else "") +
             (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
         h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))

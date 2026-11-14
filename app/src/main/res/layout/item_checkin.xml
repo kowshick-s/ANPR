@@ -26,9 +26,8 @@
 
         <TextView
             android:id="@+id/plateText"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="4"
             android:background="@drawable/row_bg"
             android:clickable="true"
             android:focusable="true"
@@ -43,8 +42,8 @@
             android:id="@+id/name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="4"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
             android:background="@drawable/cell_field_bg"
                 android:minHeight="34dp"
                 android:paddingStart="10dp"
@@ -61,18 +60,19 @@
 
         <TextView
             android:id="@+id/when"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="3"
+            android:layout_marginStart="8dp"
             android:background="@drawable/row_bg"
             android:fontFeatureSettings="tnum"
             android:gravity="end"
-            android:maxLines="2"
+            android:lineSpacingExtra="1dp"
+            android:paddingStart="4dp"
             android:paddingTop="2dp"
+            android:paddingEnd="2dp"
             android:paddingBottom="2dp"
             android:textColor="@color/text_dim"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/out"

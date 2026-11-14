@@ -120,6 +120,10 @@ interface VehicleEntryDao {
     @Query("SELECT name FROM vehicle_entries WHERE plate = :plate AND name IS NOT NULL AND name != '' ORDER BY entryTime DESC LIMIT 1")
     suspend fun lastNameFor(plate: String): String?
 
+    /** Names/tokens typed for this plate, newest first (tokens are filtered out by the caller). */
+    @Query("SELECT name FROM vehicle_entries WHERE plate = :plate AND name IS NOT NULL AND name != '' ORDER BY entryTime DESC LIMIT 30")
+    suspend fun namesFor(plate: String): List<String>
+
     @Query("SELECT model FROM vehicle_entries WHERE plate = :plate AND model IS NOT NULL AND model != '' ORDER BY entryTime DESC LIMIT 1")
     suspend fun lastModelFor(plate: String): String?
 
