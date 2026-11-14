@@ -446,27 +446,26 @@ class SettingsActivity : AppCompatActivity() {
     private var userSummary = ""
 
     private fun setupSections() {
-        val R = com.vehiclegate.anpr.R.drawable
         val backup = com.vehiclegate.anpr.backup.BackupStore(this)
         val P = com.vehiclegate.anpr.admin.DeviceProtection
         sections = listOf(
-            Section("cameras", R.ic_videocam, "Cameras", b.secCameras,
+            Section("cameras", com.vehiclegate.anpr.R.drawable.ic_videocam, "Cameras", b.secCameras,
                 { if (cameras.isEmpty()) "No cameras added" else "${cameras.size} camera" + (if (cameras.size == 1) "" else "s") + " · ${cameras.count { it.enabled }} on" },
                 { cameras.isEmpty() }),
-            Section("parking", R.ic_parking, "Parking and fees", b.secParking,
+            Section("parking", com.vehiclegate.anpr.R.drawable.ic_parking, "Parking and fees", b.secParking,
                 { "₹${b.feeAmount.text} per ${b.feePeriodHours.text} h" }),
-            Section("monthly", R.ic_group, "Monthly users", b.secMonthly, { "$memberCount members" }),
-            Section("users", R.ic_lock, "Users and roles", b.secUsers, { userSummary }),
-            Section("detection", R.ic_search, "Plate detection", b.secDetection,
+            Section("monthly", com.vehiclegate.anpr.R.drawable.ic_group, "Monthly users", b.secMonthly, { "$memberCount members" }),
+            Section("users", com.vehiclegate.anpr.R.drawable.ic_lock, "Users and roles", b.secUsers, { userSummary }),
+            Section("detection", com.vehiclegate.anpr.R.drawable.ic_search, "Plate detection", b.secDetection,
                 { (if (b.useAiPlates.isChecked) "AI on" else "AI off") + " · " + b.commonStates.text.toString().replace(",", ", ") }),
-            Section("display", R.ic_monitor, "Display and voice", b.secDisplay,
+            Section("display", com.vehiclegate.anpr.R.drawable.ic_monitor, "Display and voice", b.secDisplay,
                 { listOf(
                     when (b.themeGroup.checkedRadioButtonId) { com.vehiclegate.anpr.R.id.themeLight -> "Light"; com.vehiclegate.anpr.R.id.themeDark -> "Dark"; else -> "Same as device" },
                     if (b.voiceGroup.checkedRadioButtonId == com.vehiclegate.anpr.R.id.voiceEnglish) "English" else "Tamil + English"
                 ).joinToString(" · ") }),
-            Section("pictures", R.ic_photo, "Pictures and history", b.secPictures,
+            Section("pictures", com.vehiclegate.anpr.R.drawable.ic_photo, "Pictures and history", b.secPictures,
                 { "Pictures kept ${b.keepPicturesDays.text} days" + if (b.plateCropOnly.isChecked) " · plate only" else "" }),
-            Section("backup", R.ic_cloud, "Backup and sync", b.secBackup,
+            Section("backup", com.vehiclegate.anpr.R.drawable.ic_cloud, "Backup and sync", b.secBackup,
                 { when {
                     !backup.ready -> "Email backup not set up"
                     !backup.enabled -> "Email backup off"
@@ -474,7 +473,7 @@ class SettingsActivity : AppCompatActivity() {
                     else -> "Email backup on"
                 } },
                 { !backup.ready || !backup.enabled || backup.lastResult.startsWith("Backup failed") }),
-            Section("protection", R.ic_shield, "Device protection", b.secProtection,
+            Section("protection", com.vehiclegate.anpr.R.drawable.ic_shield, "Device protection", b.secProtection,
                 { when {
                     P.isKiosk(this) -> "Kiosk mode on"
                     P.isDeviceOwner(this) -> "Ready for kiosk mode"
@@ -482,7 +481,7 @@ class SettingsActivity : AppCompatActivity() {
                     else -> "Not protected"
                 } },
                 { !P.isKiosk(this) && !P.isAdminActive(this) }),
-            Section("about", R.ic_info, "About", b.secAbout, { "Build ${aboutBuild()}" })
+            Section("about", com.vehiclegate.anpr.R.drawable.ic_info, "About", b.secAbout, { "Build ${aboutBuild()}" })
         )
         b.sectionList.removeAllViews()
         for (s in sections) {
