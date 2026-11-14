@@ -487,6 +487,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
                 "To keep detecting in the background, just press Home instead.")
             .setPositiveButton("Exit") { _, _ ->
                 AnprService.stop(this)
+                com.vehiclegate.anpr.admin.DeviceProtection.leaveLockTask(this)
                 finishAndRemoveTask()
             }
             .setNegativeButton("Cancel", null)
@@ -818,4 +819,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
         set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }.timeInMillis
+
+    override fun onResume() {
+        super.onResume()
+        com.vehiclegate.anpr.admin.DeviceProtection.enterLockTask(this)
+    }
 }

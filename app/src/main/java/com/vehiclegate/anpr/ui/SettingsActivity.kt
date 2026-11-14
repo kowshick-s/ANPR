@@ -58,6 +58,31 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, UsersActivity::class.java)
                 .putExtra(EXTRA_ADMIN_OK, app.session.isAdmin || intent.getBooleanExtra(EXTRA_ADMIN_OK, false)))
         }
+        b.protectAdmin.setOnClickListener {
+            val P = com.vehiclegate.anpr.admin.DeviceProtection
+            if (P.isAdminActive(this) && !P.isDeviceOwner(this)) { P.removeAdmin(this); showProtection() } else P.askAdmin(this)
+        }
+        b.protectKiosk.setOnCheckedChangeListener { _, on ->
+            val P = com.vehiclegate.anpr.admin.DeviceProtection
+            if (on != P.isKiosk(this)) {
+                P.setKiosk(this, on)
+                if (on) P.enterLockTask(this) else P.leaveLockTask(this)
+                showProtection()
+            }
+        }
+        b.protectRelease.setOnClickListener {
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Release this device?")
+                .setMessage("Kiosk mode and the uninstall block are removed. Do this only for maintenance or to uninstall.")
+                .setPositiveButton("Release") { _, _ ->
+                    com.vehiclegate.anpr.admin.DeviceProtection.leaveLockTask(this)
+                    com.vehiclegate.anpr.admin.DeviceProtection.releaseDeviceOwner(this)
+                    showProtection()
+                }
+                .setNegativeButton("Cancel", null).show()
+        }
+        showProtection()
+
         // emergency backup by email
         val backup = com.vehiclegate.anpr.backup.BackupStore(this)
         b.backupEnabled.isChecked = backup.enabled
@@ -199,6 +224,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::b.isInitialized) showProtection()
         // An area saved in Preview while the Edit window was open: show the new numbers in it.
         openDialog?.let { (d, id) ->
             app.settingsStore.cameras().firstOrNull { it.id == id }?.let { c ->
@@ -382,6 +408,25 @@ class SettingsActivity : AppCompatActivity() {
         b.retention.setText(s.retentionDays.toString())
         b.beep.isChecked = s.beepOnEntry
         b.liveVideo.isChecked = s.showLiveVideo
+    }
+
+    /** Current uninstall protection of this device. */
+    private fun showProtection() {
+        val P = com.vehiclegate.anpr.admin.DeviceProtection
+        val owner = P.isDeviceOwner(this)
+        b.protectStatus.text = when {
+            P.isKiosk(this) -> "Kiosk mode ON: uninstall is blocked and the device stays in the app. Leaving needs the admin PIN."
+            owner -> "Set up for kiosk mode. Tick the box below to switch it on."
+            P.isAdminActive(this) -> "Uninstall warning ON: the app can't be uninstalled until this is switched off here or in Android settings."
+            else -> "Not protected. For a phone: switch on the uninstall warning. For a TV box / counter tablet used only " +
+                "for parking: kiosk mode – set up once from a laptop with USB debugging on and no Google account on the device:\n" +
+                P.ADB_COMMAND
+        }
+        b.protectAdmin.visibility = if (owner) android.view.View.GONE else android.view.View.VISIBLE
+        b.protectAdmin.text = if (P.isAdminActive(this)) "Switch off the uninstall warning" else "Switch on the uninstall warning"
+        b.protectKiosk.visibility = if (owner) android.view.View.VISIBLE else android.view.View.GONE
+        b.protectKiosk.isChecked = P.isKiosk(this)
+        b.protectRelease.visibility = if (owner) android.view.View.VISIBLE else android.view.View.GONE
     }
 
     private fun save() {

@@ -183,4 +183,9 @@ class LoginActivity : AppCompatActivity() {
         /** Open the login screen even if someone is logged in (Switch user). */
         const val EXTRA_SWITCH = "switch"
     }
+
+    override fun onResume() {
+        super.onResume()
+        com.vehiclegate.anpr.admin.DeviceProtection.enterLockTask(this)
+    }
 }

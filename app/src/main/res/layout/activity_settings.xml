@@ -82,6 +82,23 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Uninstall protection -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+            <TextView style="@style/SectionTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Protect this device from uninstall" />
+            <TextView android:id="@+id/protectStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="@color/text_dim" android:textSize="13sp" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/protectAdmin" style="@style/TvButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" />
+            <CheckBox android:id="@+id/protectKiosk" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                android:text="Kiosk mode: block uninstall, keep this device locked to the app, open it after a restart" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/protectRelease" style="@style/TvButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                android:text="Release this device (allow uninstall again)" android:textColor="@color/error" />
+        </LinearLayout>
+
         <!-- Emergency backup -->
         <LinearLayout
             android:layout_width="match_parent"

@@ -191,4 +191,9 @@ class DashboardActivity : AppCompatActivity(), AnprPipeline.Events {
                 "In ${shortTime(e.entryTime)} · ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, System.currentTimeMillis())}"
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        com.vehiclegate.anpr.admin.DeviceProtection.enterLockTask(this)
+    }
 }
