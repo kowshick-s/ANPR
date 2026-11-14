@@ -49,6 +49,20 @@ fun VehicleEntry.whoText(): String {
     return parts.joinToString(" · ").ifEmpty { "no token / name" }
 }
 
+/** Spoken model matches: best one in the box, all of them in the drop-down to pick from. */
+fun showModelChoices(field: AutoCompleteTextView, choices: List<String>) {
+    if (choices.isEmpty()) return
+    field.setText(choices.first(), false)
+    field.setSelection(field.text.length)
+    val previous = field.adapter
+    field.setAdapter(ArrayAdapter(field.context, R.layout.item_suggestion, choices))
+    field.setOnDismissListener {
+        (previous as? ArrayAdapter<*>)?.let { field.setAdapter(it) }
+        field.setOnDismissListener(null)
+    }
+    field.post { field.showDropDown() }
+}
+
 private fun afterChange(f: EditText, block: () -> Unit) = f.addTextChangedListener(object : TextWatcher {
     override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
     override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -80,6 +94,12 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         fun photo(c: Capture)
         /** Long-press: "same vehicle as …" to join two cards. */
         fun mergeMenu(c: Capture, anchor: View)
+        /** Voice: number + token/name + model in one sentence. */
+        fun speakAll(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit)
+        fun speakModel(fill: (List<String>) -> Unit)
+        fun speakWho(fill: (String) -> Unit)
+        /** The manual check-in card was opened (start listening straight away). */
+        fun manualShown(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit)
     }
 
     var expandedId: Long? = null
@@ -113,6 +133,18 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         val ignore: Button = v.findViewById(R.id.ignore)
         /** The other choice when the number is one character off a parked vehicle. */
         val alt: Button = v.findViewById(R.id.alt)
+        val speak: Button = v.findViewById(R.id.speak)
+
+        /** Fill the editor from what was said. */
+        fun applySpoken(s: com.vehiclegate.anpr.core.VoiceParse.Spoken) {
+            s.plate?.let { p ->
+                userEdited = true
+                editPlate.setText(p.formatted)
+                runLookup()
+            }
+            s.who?.let { editName.setText(it) }
+            if (s.models.isNotEmpty()) showModelChoices(editModel, s.models)
+        }
         val confirm: Button = v.findViewById(R.id.confirm)
 
         var capture: Capture? = null
@@ -143,6 +175,9 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
                 }
             }
             ignore.setOnClickListener { capture?.let { host.ignore(it) } }
+            speak.setOnClickListener { host.speakAll { applySpoken(it) } }
+            VoiceInput.attachMic(editModel) { host.speakModel { showModelChoices(editModel, it) } }
+            VoiceInput.attachMic(editName) { host.speakWho { editName.setText(it) } }
             thumb.setOnClickListener { capture?.let { host.photo(it) } }
         }
 
@@ -265,7 +300,7 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
                 h.chips.addView(chip)
             }
             h.chips.visibility = if (h.chips.childCount > 0) View.VISIBLE else View.GONE
-            if (manual) h.editPlate.requestFocus() else h.runLookup()
+            if (manual) { h.editPlate.requestFocus(); host.manualShown { h.applySpoken(it) } } else h.runLookup()
         }
     }
 
@@ -296,7 +331,9 @@ class CheckInAdapter(
     private val onPhoto: (VehicleEntry) -> Unit,
     private val onLongClick: (VehicleEntry) -> Unit,
     private val loadThumb: (String?, ImageView) -> Unit,
-    private val hideKeyboard: () -> Unit
+    private val hideKeyboard: () -> Unit,
+    private val speakModel: ((List<String>) -> Unit) -> Unit,
+    private val speakWho: ((String) -> Unit) -> Unit
 ) : ListAdapter<VehicleEntry, CheckInAdapter.VH>(DIFF) {
 
     init { setHasStableIds(true) }
@@ -354,6 +391,8 @@ class CheckInAdapter(
                     out.removeCallbacks(disarm); out.postDelayed(disarm, 4000)
                 }
             }
+            VoiceInput.attachMic(model) { speakModel { showModelChoices(model, it) } }
+            VoiceInput.attachMic(name) { speakWho { name.setText(it) } }
             edit.setOnClickListener {
                 val e = entry ?: return@setOnClickListener
                 editingId = e.id; expandedId = e.id

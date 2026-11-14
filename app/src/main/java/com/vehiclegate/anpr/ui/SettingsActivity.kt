@@ -343,6 +343,7 @@ class SettingsActivity : AppCompatActivity() {
         b.strictStates.isChecked = s.strictStates
         b.useAiPlates.isChecked = s.useAiPlates
         b.plateCropOnly.isChecked = s.plateCropOnly
+        b.voiceGroup.check(if (s.voiceLanguage == "en-IN") com.vehiclegate.anpr.R.id.voiceEnglish else com.vehiclegate.anpr.R.id.voiceTamil)
         b.keepPicturesDays.setText(s.keepPicturesDays.toString())
         b.themeGroup.check(when (s.themeMode) { 1 -> com.vehiclegate.anpr.R.id.themeLight; 2 -> com.vehiclegate.anpr.R.id.themeDark; else -> com.vehiclegate.anpr.R.id.themeSystem })
         b.movingOnly.isChecked = s.movingOnly
@@ -379,6 +380,7 @@ class SettingsActivity : AppCompatActivity() {
                 movingOnly = b.movingOnly.isChecked,
                 themeMode = themeMode(),
                 plateCropOnly = b.plateCropOnly.isChecked,
+                voiceLanguage = if (b.voiceGroup.checkedRadioButtonId == com.vehiclegate.anpr.R.id.voiceEnglish) "en-IN" else "ta-IN",
                 keepPicturesDays = b.keepPicturesDays.int(d.keepPicturesDays).coerceIn(0, 3650)
             )
         )

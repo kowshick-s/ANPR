@@ -146,6 +146,16 @@
                 <RadioButton android:id="@+id/themeDark" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Dark" />
             </RadioGroup>
 
+            <TextView style="@style/FieldLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Voice input (mic buttons) – language the staff speak" />
+            <RadioGroup
+                android:id="@+id/voiceGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton android:id="@+id/voiceTamil" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="16dp" android:text="Tamil + English (mixed)" />
+                <RadioButton android:id="@+id/voiceEnglish" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="English only" />
+            </RadioGroup>
+
             <CheckBox
                 android:id="@+id/plateCropOnly"
                 android:layout_width="wrap_content"

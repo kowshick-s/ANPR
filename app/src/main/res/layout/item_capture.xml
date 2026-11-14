@@ -148,7 +148,9 @@
                 android:hint="Token / Name"
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textCapWords"
-                android:textSize="14sp" />
+                android:textSize="14sp"     android:drawableEnd="@drawable/ic_mic"
+                android:drawablePadding="4dp"
+                />
 
             <AutoCompleteTextView
                 android:id="@+id/editModel"
@@ -169,7 +171,9 @@
                 android:imeOptions="actionDone|flagNoExtractUi"
                 android:inputType="textCapWords"
                 android:popupBackground="@drawable/card_bg"
-                android:textSize="14sp" />
+                android:textSize="14sp"     android:drawableEnd="@drawable/ic_mic"
+                android:drawablePadding="4dp"
+                />
         </LinearLayout>
 
         <LinearLayout
@@ -197,6 +201,17 @@
                 android:maxLines="2"
                 android:textColor="@color/text_dim"
                 android:textSize="12sp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/speak"
+                style="@style/TvButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:drawableStart="@drawable/ic_mic"
+                android:drawablePadding="6dp"
+                android:paddingStart="12dp"
+                android:text="Speak" />
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/alt"

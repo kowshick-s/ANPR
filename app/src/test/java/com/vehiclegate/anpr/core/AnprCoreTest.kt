@@ -209,4 +209,35 @@ class AnprCoreTest {
         assertTrue(f.accept("cam2", 0.5f, 0.5f, 12_500))            // other camera
         assertTrue(f.accept("cam1", 0.5f, 0.5f, 30_000))            // left and a new one stopped
     }
+
+    @Test
+    fun voiceInEnglishTamilAndTanglish() {
+        val models = VehicleModels.COMMON
+        val en = VoiceParse.parse(listOf("TN 23 AU 5973 token 29 Activa"), models)!!
+        assertEquals("TN23AU5973", en.plate?.compact)
+        assertEquals("29", en.who)
+        assertTrue(en.models.first().contains("Activa"))
+
+        val ta = VoiceParse.parse(listOf("டி என் இருபத்தி மூணு ஏ யு அஞ்சு ஒம்போது ஏழு மூணு டோக்கன் பதினொன்னு"), models)!!
+        assertEquals("TN23AU5973", ta.plate?.compact)
+        assertEquals("11", ta.who)
+
+        val tg = VoiceParse.parse(listOf("tn irubathi moonu a u fifty nine seventy three token pathinonu"), models)!!
+        assertEquals("TN23AU5973", tg.plate?.compact)
+        assertEquals("11", tg.who)
+
+        // joined Tamil numbers and "double"
+        val j = VoiceParse.parse(listOf("tn 09 ab இருபத்தொன்னு double five"), models)!!
+        assertEquals("TN09AB2155", j.plate?.compact)
+
+        // first alternative without a plate is skipped
+        val alt = VoiceParse.parse(listOf("hello", "TN 01 AB 1234"), models)!!
+        assertEquals("TN01AB1234", alt.plate?.compact)
+
+        assertEquals("11", VoiceParse.searchText(listOf("token pathinonu")))
+        assertEquals("29", VoiceParse.searchText(listOf("இருபத்தி ஒன்பது")))
+        assertTrue(VoiceParse.matchModels("ஆக்டிவா", models).first().contains("Activa"))
+        assertTrue(VoiceParse.matchModels("splendor", models).first().contains("Splendor"))
+        assertTrue(VoiceParse.matchModels("jupiter", models).first().contains("Jupiter"))
+    }
 }

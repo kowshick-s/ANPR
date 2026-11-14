@@ -77,7 +77,9 @@ data class AppSettings(
     /** Save only the plate crop (≈10 KB) instead of crop + small scene picture (≈50 KB). */
     val plateCropOnly: Boolean = false,
     /** Pictures of checked-out visits are deleted after this many days (0 = keep). */
-    val keepPicturesDays: Int = 7
+    val keepPicturesDays: Int = 7,
+    /** Speech recogniser language: "ta-IN" (Tamil + English mixed) or "en-IN" */
+    val voiceLanguage: String = "ta-IN"
 )
 
 class SettingsStore(context: Context) {
@@ -120,7 +122,8 @@ class SettingsStore(context: Context) {
             useAiPlates = prefs.getBoolean("useAiPlates", d.useAiPlates),
             themeMode = prefs.getInt("themeMode", d.themeMode),
             plateCropOnly = prefs.getBoolean("plateCropOnly", d.plateCropOnly),
-            keepPicturesDays = prefs.getInt("keepPicturesDays", d.keepPicturesDays)
+            keepPicturesDays = prefs.getInt("keepPicturesDays", d.keepPicturesDays),
+            voiceLanguage = prefs.getString("voiceLanguage", d.voiceLanguage) ?: d.voiceLanguage
         )
     }
 
@@ -145,6 +148,7 @@ class SettingsStore(context: Context) {
             .putInt("themeMode", s.themeMode)
             .putBoolean("plateCropOnly", s.plateCropOnly)
             .putInt("keepPicturesDays", s.keepPicturesDays)
+            .putString("voiceLanguage", s.voiceLanguage)
             .apply()
     }
 
@@ -160,7 +164,7 @@ class SettingsStore(context: Context) {
             .put("siteTitle", st.siteTitle).put("commonStates", st.commonStates)
             .put("strictStates", st.strictStates).put("movingOnly", st.movingOnly)
             .put("feeAmount", st.feeAmount).put("feePeriodHours", st.feePeriodHours)
-            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates).put("themeMode", st.themeMode).put("plateCropOnly", st.plateCropOnly).put("keepPicturesDays", st.keepPicturesDays)
+            .put("minStayMinutes", st.minStayMinutes).put("useAiPlates", st.useAiPlates).put("themeMode", st.themeMode).put("plateCropOnly", st.plateCropOnly).put("keepPicturesDays", st.keepPicturesDays).put("voiceLanguage", st.voiceLanguage)
         return JSONObject().put("app", "VehicleGateANPR").put("format", 1)
             .put("cameras", cams).put("settings", set).toString(2)
     }
@@ -193,7 +197,8 @@ class SettingsStore(context: Context) {
                 useAiPlates = j.optBoolean("useAiPlates", d.useAiPlates),
                 themeMode = j.optInt("themeMode", d.themeMode),
                 plateCropOnly = j.optBoolean("plateCropOnly", d.plateCropOnly),
-                keepPicturesDays = j.optInt("keepPicturesDays", d.keepPicturesDays)
+                keepPicturesDays = j.optInt("keepPicturesDays", d.keepPicturesDays),
+                voiceLanguage = j.optString("voiceLanguage", d.voiceLanguage)
             ))
         }
         return cams.size

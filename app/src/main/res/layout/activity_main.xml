@@ -264,6 +264,7 @@
                     android:layout_weight="1"
                     android:background="@drawable/cell_field_bg"
                     android:drawableStart="@drawable/ic_search"
+                    android:drawableEnd="@drawable/ic_mic"
                     android:drawablePadding="8dp"
                     android:hint="Search token, number, name"
                     android:imeOptions="actionSearch|flagNoExtractUi"

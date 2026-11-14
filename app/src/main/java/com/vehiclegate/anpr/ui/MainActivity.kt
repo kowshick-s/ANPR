@@ -66,7 +66,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  In ${shortTime(it.entryTime)}  ·  ${it.whoText()}") },
         onLongClick = { confirmDelete(it) },
         loadThumb = { path, iv -> loadThumb(path, iv) },
-        hideKeyboard = { hideKeyboard() }
+        hideKeyboard = { hideKeyboard() },
+        speakModel = { fill -> speakModel(fill) },
+        speakWho = { fill -> speakWho(fill) }
     )
     private val outAdapter = OutAdapter(
         onUndo = { e ->
@@ -157,6 +159,14 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             override fun afterTextChanged(s: android.text.Editable?) = refreshLists()
         })
         askPermissionsOnce()
+        VoiceInput.attachMic(b.search) {
+            hideKeyboard()
+            voice.listen(settings.voiceLanguage, "say the token or bike number") { alts ->
+                val q = com.vehiclegate.anpr.core.VoiceParse.searchText(alts)
+                b.lastEvent.text = "Heard: \"${alts.first()}\" → searching $q"
+                b.search.setText(q)
+            }
+        }
 
         lifecycleScope.launch {
             app.db.captures().pendingFlow().collect { list -> pending = list; refreshCaptures() }
@@ -316,6 +326,47 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
             true
         }
         menu.show()
+    }
+
+    // ------------------------------------------------------------------ voice
+
+    private val voice by lazy { VoiceInput(this) { b.lastEvent.text = it } }
+    private fun models() = modelNames.toList()
+
+    override fun speakAll(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit) {
+        hideKeyboard()
+        voice.listen(settings.voiceLanguage, "say the bike number, then token / name and model") { alts ->
+            val s = com.vehiclegate.anpr.core.VoiceParse.parse(alts, models()) ?: return@listen
+            b.lastEvent.text = "Heard: \"${s.heard}\"" + if (s.plate == null) " – no bike number found, speak again or type it" else ""
+            fill(s)
+        }
+    }
+
+    override fun speakModel(fill: (List<String>) -> Unit) {
+        hideKeyboard()
+        voice.listen(settings.voiceLanguage, "say the model") { alts ->
+            val m = alts.flatMap { com.vehiclegate.anpr.core.VoiceParse.matchModels(it, models()) }.distinct().take(6)
+            b.lastEvent.text = "Heard: \"${alts.first()}\"" + if (m.isEmpty()) " – no known model matched, typed as said" else " – pick from the list"
+            fill(m.ifEmpty { listOf(alts.first().trim()) })
+        }
+    }
+
+    override fun speakWho(fill: (String) -> Unit) {
+        hideKeyboard()
+        voice.listen(settings.voiceLanguage, "say the token number or name") { alts ->
+            val text = com.vehiclegate.anpr.core.VoiceParse.searchText(alts)
+            b.lastEvent.text = "Heard: \"${alts.first()}\""
+            fill(text)
+        }
+    }
+
+    override fun manualShown(fill: (com.vehiclegate.anpr.core.VoiceParse.Spoken) -> Unit) {
+        if (voice.available() && voice.hasPermission()) speakAll(fill)
+    }
+
+    override fun onDestroy() {
+        voice.destroy()
+        super.onDestroy()
     }
 
     override fun photo(c: Capture) = showPicture(c.snapshotPath, "${c.plateFormatted}  ·  ${shortTime(c.firstSeen)}  ·  ${c.reads} reads")

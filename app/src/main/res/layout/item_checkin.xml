@@ -213,7 +213,9 @@
                 android:hint="Token / Name"
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textCapWords"
-                android:textSize="14sp" />
+                android:textSize="14sp"     android:drawableEnd="@drawable/ic_mic"
+                android:drawablePadding="4dp"
+                />
 
             <AutoCompleteTextView
                 android:id="@+id/model"
@@ -236,7 +238,9 @@
                 android:imeOptions="actionDone|flagNoExtractUi"
                 android:inputType="textCapWords"
                 android:popupBackground="@drawable/card_bg"
-                android:textSize="13sp" />
+                android:textSize="13sp"     android:drawableEnd="@drawable/ic_mic"
+                android:drawablePadding="4dp"
+                />
         </LinearLayout>
 
         <LinearLayout
