@@ -105,10 +105,10 @@ object AnprEngine {
             listeners.forEach { it.onCameraScan(cameraId, scans, motion) }
         }
 
-        override fun onVehicleLeaving(entry: VehicleEntry) {
-            if (beep) try { tone?.startTone(ToneGenerator.TONE_PROP_ACK, 400) } catch (_: Exception) {}
-            listeners.forEach { it.onVehicleLeaving(entry) }
-            onSummaryChanged?.invoke()
+        override fun onCaptured(capture: com.vehiclegate.anpr.data.Capture, isNew: Boolean) {
+            if (beep && isNew) try { tone?.startTone(ToneGenerator.TONE_PROP_ACK, 300) } catch (_: Exception) {}
+            listeners.forEach { it.onCaptured(capture, isNew) }
+            if (isNew) onSummaryChanged?.invoke()
         }
 
         override fun onAutoCheckedOut(entry: VehicleEntry) {

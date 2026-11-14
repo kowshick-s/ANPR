@@ -1,119 +1,126 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One parked vehicle. Everything is edited in the row (no pop-ups): number, Token/Name, Model.
-     Saved automatically. Out = vehicle leaving. Long-press the time = delete. -->
+<!-- One parked vehicle (two lines). Number, Token/Name and Model are edited in the row and saved
+     automatically. Check out = tap twice. Long-press the time = delete. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="4dp"
-    android:paddingTop="5dp"
+    android:paddingTop="7dp"
     android:paddingEnd="4dp"
-    android:paddingBottom="5dp">
+    android:paddingBottom="7dp">
 
     <View
         android:id="@+id/mark"
         android:layout_width="3dp"
-        android:layout_height="28dp"
+        android:layout_height="match_parent"
         android:layout_marginEnd="8dp"
         android:background="@color/checkin" />
 
-    <EditText
-        android:id="@+id/plate"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="4"
-        android:background="@drawable/cell_field_bg"
-        android:minHeight="40dp"
-        android:gravity="center_vertical"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/plate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="5"
+                android:background="@drawable/cell_field_bg"
+        android:minHeight="38dp"
         android:paddingStart="10dp"
         android:paddingEnd="8dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
         android:singleLine="true"
         android:textColor="@color/text"
         android:textColorHint="@color/text_dim"
-        android:fontFamily="@font/inter_semibold"
-        android:hint="Vehicle no."
-        android:imeOptions="actionNext|flagNoExtractUi"
-        android:inputType="textCapCharacters|textNoSuggestions"
-        android:letterSpacing="0.02"
-        android:textSize="15sp" />
+                android:fontFamily="@font/inter_semibold"
+                android:hint="Vehicle no."
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textCapCharacters|textNoSuggestions"
+                android:textSize="15sp" />
 
-    <EditText
-        android:id="@+id/name"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_weight="4"
-        android:background="@drawable/cell_field_bg"
-        android:minHeight="40dp"
-        android:gravity="center_vertical"
+            <EditText
+                android:id="@+id/name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="4"
+                android:background="@drawable/cell_field_bg"
+        android:minHeight="38dp"
         android:paddingStart="10dp"
         android:paddingEnd="8dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
         android:singleLine="true"
         android:textColor="@color/text"
         android:textColorHint="@color/text_dim"
-        android:hint="Token / Name"
-        android:imeOptions="actionNext|flagNoExtractUi"
-        android:inputType="textCapWords"
-        android:textSize="14sp" />
+                android:hint="Token / Name"
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textCapWords"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-    <AutoCompleteTextView
-        android:id="@+id/model"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_weight="3"
-        android:background="@drawable/cell_field_bg"
-        android:minHeight="40dp"
-        android:gravity="center_vertical"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <AutoCompleteTextView
+                android:id="@+id/model"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="4"
+                android:background="@drawable/cell_field_bg"
+        android:minHeight="38dp"
         android:paddingStart="10dp"
         android:paddingEnd="8dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
         android:singleLine="true"
         android:textColor="@color/text"
         android:textColorHint="@color/text_dim"
-        android:completionThreshold="1"
-        android:dropDownWidth="260dp"
-        android:hint="Model"
-        android:imeOptions="actionDone|flagNoExtractUi"
-        android:inputType="textCapWords"
-        android:popupBackground="@drawable/card_bg"
-        android:textSize="14sp" />
+                android:completionThreshold="1"
+                android:dropDownWidth="260dp"
+                android:hint="Model"
+                android:imeOptions="actionDone|flagNoExtractUi"
+                android:inputType="textCapWords"
+                android:popupBackground="@drawable/card_bg"
+                android:textSize="13sp" />
 
-    <TextView
-        android:id="@+id/when"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:layout_weight="2.4"
-        android:background="@drawable/row_bg"
-        android:fontFeatureSettings="tnum"
-        android:gravity="end"
-        android:maxLines="3"
-        android:padding="4dp"
-        android:textColor="@color/text_dim"
-        android:textSize="12sp" />
+            <TextView
+                android:id="@+id/when"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="4"
+                android:background="@drawable/row_bg"
+                android:fontFeatureSettings="tnum"
+                android:maxLines="2"
+                android:padding="4dp"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
 
-    <ImageButton
-        android:id="@+id/photo"
-        style="@style/IconButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="4dp"
-        android:contentDescription="View picture"
-        android:padding="9dp"
-        android:src="@drawable/ic_photo" />
+            <ImageButton
+                android:id="@+id/photo"
+                style="@style/IconButton"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:contentDescription="View picture"
+                android:padding="9dp"
+                android:src="@drawable/ic_photo" />
 
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/out"
-        style="@style/TvButton.OutSmall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:text="Out" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/out"
+                style="@style/TvButton.OutSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="Check out" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

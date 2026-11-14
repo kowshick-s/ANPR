@@ -47,8 +47,8 @@ class AnprPipeline(
         /** Plate-reading activity per camera (main thread). */
         fun onCameraScan(cameraId: String, scans: Int, motion: Boolean) {}
 
-        /** A parked (daily) vehicle was seen leaving – waits in the CHECK-OUT list. Main thread. */
-        fun onVehicleLeaving(entry: VehicleEntry) {}
+        /** A vehicle was added to (or merged into) the CAPTURED waiting list. Main thread. */
+        fun onCaptured(capture: com.vehiclegate.anpr.data.Capture, isNew: Boolean) {}
 
         /** A monthly vehicle was seen leaving and checked out automatically. Main thread. */
         fun onAutoCheckedOut(entry: VehicleEntry) {}
@@ -186,14 +186,13 @@ class AnprPipeline(
                     cameraSummary = summary,
                     snapshotPath = path
                 )
-                // Parking rules decide: check-in, leaving, auto check-out or ignore.
-                val r = app.parking.onDetected(e, app.settingsStore.settings())
-                if (r !is ParkingDesk.Result.CheckedIn) path?.let { File(it).delete() }
-                r
+                // Parking rules decide: monthly auto check-in/out, waiting list, or ignore.
+                // (The desk keeps or deletes the picture.)
+                app.parking.onDetected(e, app.settingsStore.settings())
             }
             when (entry) {
                 is ParkingDesk.Result.CheckedIn -> events.onVehicleSaved(entry.entry)
-                is ParkingDesk.Result.Leaving -> events.onVehicleLeaving(entry.entry)
+                is ParkingDesk.Result.Captured -> events.onCaptured(entry.capture, entry.isNew)
                 is ParkingDesk.Result.AutoCheckedOut -> events.onAutoCheckedOut(entry.entry)
                 is ParkingDesk.Result.Ignored -> events.onSkipped(entry.plate, entry.reason)
             }

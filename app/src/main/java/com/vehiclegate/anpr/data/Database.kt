@@ -94,6 +94,18 @@ interface VehicleEntryDao {
     @Query("SELECT * FROM vehicle_entries WHERE status = 'EXIT' ORDER BY exitDetectedAt DESC")
     fun leaving(): Flow<List<VehicleEntry>>
 
+    /** Parked vehicles (also old "seen leaving" ones), newest first. */
+    @Query("SELECT * FROM vehicle_entries WHERE status IN ('IN','EXIT') ORDER BY entryTime DESC")
+    fun openFlow(): Flow<List<VehicleEntry>>
+
+    /** Latest check-outs. */
+    @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime IS NOT NULL ORDER BY exitTime DESC LIMIT :limit")
+    fun recentOut(limit: Int): Flow<List<VehicleEntry>>
+
+    /** Every check-out (for search in the Checked out tab). */
+    @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime IS NOT NULL ORDER BY exitTime DESC LIMIT 2000")
+    suspend fun outForSearch(): List<VehicleEntry>
+
     /** Sessions not yet closed (parked or seen leaving). */
     @Query("SELECT * FROM vehicle_entries WHERE status IN ('IN','EXIT') ORDER BY entryTime DESC")
     suspend fun openSessions(): List<VehicleEntry>
@@ -164,6 +176,60 @@ interface MonthlyMemberDao {
     suspend fun delete(plate: String)
 }
 
+/** Capture card states. */
+object CaptureStatus {
+    const val PENDING = "PENDING"
+    const val DONE = "DONE"
+    const val IGNORED = "IGNORED"
+    const val EXPIRED = "EXPIRED"
+}
+
+/**
+ * Waiting list: a vehicle the cameras read, not yet checked in. Different OCR readings of the same
+ * vehicle are merged into one card ([readings]); staff pick/correct the number and check it in.
+ */
+@Entity(tableName = "captures", indices = [Index("lastSeen")])
+data class Capture(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Best reading so far (compact / display) */
+    val plate: String,
+    val plateFormatted: String,
+    val firstSeen: Long,
+    val lastSeen: Long,
+    val reads: Int,
+    /** All readings, see CaptureLogic.encode */
+    val readings: String,
+    val snapshotPath: String?,
+    val confidence: Float,
+    val cameraSummary: String,
+    val status: String = CaptureStatus.PENDING
+)
+
+@Dao
+interface CaptureDao {
+    @Query("SELECT * FROM captures WHERE status = 'PENDING' ORDER BY lastSeen DESC")
+    fun pendingFlow(): Flow<List<Capture>>
+
+    @Query("SELECT * FROM captures WHERE status = 'PENDING' AND lastSeen >= :since ORDER BY lastSeen DESC")
+    suspend fun pendingSince(since: Long): List<Capture>
+
+    @Query("SELECT * FROM captures WHERE id = :id")
+    suspend fun get(id: Long): Capture?
+
+    @Insert
+    suspend fun insert(c: Capture): Long
+
+    @Update
+    suspend fun update(c: Capture)
+
+    /** Pending cards nobody handled: expire them (and return their pictures for deleting). */
+    @Query("SELECT * FROM captures WHERE status = 'PENDING' AND lastSeen < :before")
+    suspend fun stale(before: Long): List<Capture>
+
+    @Query("DELETE FROM captures WHERE lastSeen < :before AND status != 'PENDING'")
+    suspend fun deleteBefore(before: Long)
+}
+
 /**
  * A plate number staff corrected by hand. When the cameras read [wrong] again, it is saved as
  * [correct] automatically (the same bike is often misread the same way every day).
@@ -187,11 +253,12 @@ interface PlateFixDao {
     suspend fun delete(plate: String)
 }
 
-@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class], version = 4, exportSchema = false)
+@Database(entities = [VehicleEntry::class, MonthlyMember::class, PlateFix::class, Capture::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun entries(): VehicleEntryDao
     abstract fun members(): MonthlyMemberDao
     abstract fun fixes(): PlateFixDao
+    abstract fun captures(): CaptureDao
 
     companion object {
         /** v1 → v2: parking columns + monthly members table. Keeps existing history. */
@@ -228,9 +295,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5: capture waiting list. */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `captures` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`plate` TEXT NOT NULL, `plateFormatted` TEXT NOT NULL, `firstSeen` INTEGER NOT NULL, " +
+                        "`lastSeen` INTEGER NOT NULL, `reads` INTEGER NOT NULL, `readings` TEXT NOT NULL, " +
+                        "`snapshotPath` TEXT, `confidence` REAL NOT NULL, `cameraSummary` TEXT NOT NULL, " +
+                        "`status` TEXT NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_captures_lastSeen` ON `captures` (`lastSeen`)")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "vehicle_gate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
     }

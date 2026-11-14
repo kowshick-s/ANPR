@@ -161,4 +161,38 @@ class AnprCoreTest {
         assertEquals("2h 05m", ParkingFee.duration(0, 2 * h + 5 * 60_000))
         assertEquals("1d 3h", ParkingFee.duration(0, 27 * h))
     }
+
+    @Test
+    fun captureMergesMisreadsOfOneVehicle() {
+        // same bike read several ways: letters confused, digits right
+        assertTrue(CaptureLogic.similar("TN23BR7627", "TN23BR7627"))
+        assertTrue(CaptureLogic.similar("TN23BR7627", "TN28BR7627"))   // 1 char
+        assertTrue(CaptureLogic.similar("TN23BR7627", "TN23HR7621"))   // 2 chars
+        assertTrue(CaptureLogic.similar("TN23BR7627", "KA01AB7627"))   // same 4-digit number
+        assertTrue(!CaptureLogic.similar("TN23BR7627", "TN09AB1234"))
+        var list = listOf(Reading("TN23BR7627", "TN 23 BR 7627", 0.8f, 1))
+        list = CaptureLogic.merge(list, Reading("TN28BR7627", "TN 28 BR 7627", 0.9f, 1))
+        list = CaptureLogic.merge(list, Reading("TN23BR7627", "TN 23 BR 7627", 0.7f, 2))
+        assertEquals("TN23BR7627", list.first().compact)                 // evidence adds up
+        assertEquals(3, list.first().count)
+        val round = CaptureLogic.decode(CaptureLogic.encode(list))
+        assertEquals(list.map { it.compact }, round.map { it.compact })
+        assertEquals(2, round.size)
+    }
+
+    @Test
+    fun searchPrefersTokenForDigits() {
+        // "12" typed: token 12 first, then token 123, then plate ending in 12
+        val rows = listOf(
+            Triple("TN09AB1212", "Ravi", ""),
+            Triple("TN01CD4455", "123", ""),
+            Triple("TN22EF9999", "12", "Activa")
+        )
+        val ranked = rows.mapNotNull { (p, w, m) -> CaptureLogic.rank("12", p, w, m)?.let { it to p } }
+            .sortedBy { it.first }.map { it.second }
+        assertEquals(listOf("TN22EF9999", "TN01CD4455", "TN09AB1212"), ranked)
+        assertEquals(1, CaptureLogic.rank("tn 01 cd", "TN01CD4455", "Ravi", null))
+        assertEquals(2, CaptureLogic.rank("rav", "TN09AB1212", "Ravi", null))
+        assertNull(CaptureLogic.rank("xyz", "TN09AB1212", "Ravi", "Activa"))
+    }
 }

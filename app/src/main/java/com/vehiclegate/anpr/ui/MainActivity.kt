@@ -16,10 +16,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.vehiclegate.anpr.AnprApp
 import com.vehiclegate.anpr.AnprPipeline
+import com.vehiclegate.anpr.ParkingDesk
 import com.vehiclegate.anpr.R
 import com.vehiclegate.anpr.camera.CameraStream
 import com.vehiclegate.anpr.data.AppSettings
 import com.vehiclegate.anpr.data.CameraConfig
+import com.vehiclegate.anpr.data.Capture
 import com.vehiclegate.anpr.data.VehicleEntry
 import com.vehiclegate.anpr.databinding.ActivityMainBinding
 import com.vehiclegate.anpr.service.AnprEngine
@@ -34,31 +36,40 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The TV dashboard: latest vehicle (big plate + date + entry time + snapshot + per-camera
- * comparison), recent entries list, and live tiles for every camera.
+ * Counter screen: CAPTURED waiting list (camera reads waiting for staff), PARKED vehicles with search
+ * (check out here) and recent CHECKED OUT, plus live camera tiles.
  */
-class MainActivity : AppCompatActivity(), AnprPipeline.Events {
+class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Host {
 
     private lateinit var b: ActivityMainBinding
     private val app get() = application as AnprApp
+
+    private val captureAdapter = CaptureAdapter(this)
     private val parkedAdapter = CheckInAdapter(
         onSave = { e, who, m ->
-            lifecycleScope.launch(Dispatchers.IO) { app.parking.saveDetails(e, who, m) }
+            lifecycleScope.launch {
+                val dup = withContext(Dispatchers.IO) { app.parking.saveDetails(e, who, m) }
+                if (dup != null) b.lastEvent.text = "Token $who is also given to ${dup.plateFormatted} – check the token"
+            }
             if (m.isNotBlank()) addModelSuggestion(m)
         },
         modelSuggestions = { modelAdapter },
         onPlateEdit = { e, p -> correctPlate(e, p) },
-        onPhoto = { showPhoto(it) },
-        onOut = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.markLeaving(e, app.settingsStore.settings()) } } },
+        amountFor = { app.parking.amountDue(it, settings) },
+        onCheckOut = { checkOut(it) },
+        onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  In ${shortTime(it.entryTime)}  ·  ${it.whoText()}") },
         onLongClick = { confirmDelete(it) }
     )
-    private val leavingAdapter = LeavingAdapter(
-        amountFor = { app.parking.amountDue(it, app.settingsStore.settings()) },
-        onPlateEdit = { e, p -> correctPlate(e, p) },
-        onPhoto = { showPhoto(it) },
-        onCheckout = { confirmCheckout(it) },
-        onNotLeaving = { e -> lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.cancelExit(e) } } }
+    private val outAdapter = OutAdapter(
+        onUndo = { e ->
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) { app.parking.undoCheckOut(e) }
+                b.lastEvent.text = "Check-out undone: ${e.plateFormatted} is parked again"
+            }
+        },
+        onPhoto = { showPicture(it.snapshotPath, "${it.plateFormatted}  ·  ${it.whoText()}") }
     )
+
     /** Model suggestions while typing: common models + every model typed before. */
     private var modelAdapter: android.widget.ArrayAdapter<String>? = null
     private val modelNames = java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
@@ -93,23 +104,29 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     private var settings = AppSettings()
     private var countJob: Job? = null
     private var countDayStart = 0L
-    private var shownLatestId = -1L
 
-    private val clockFmt = SimpleDateFormat("EEE, dd MMM yyyy  hh:mm:ss a", Locale.getDefault())
-    private val dateFmt = SimpleDateFormat("dd MMM yyyy, EEEE", Locale.getDefault())
+    // counter state
+    private var pending: List<Capture> = emptyList()
+    private var parkedAll: List<VehicleEntry> = emptyList()
+    private var outAll: List<VehicleEntry> = emptyList()
+    private var manualOpen = false
+    private var showOut = false
+    private var lookupJob: Job? = null
+
+    private val clockFmt = SimpleDateFormat("EEE, dd MMM yyyy  ·  hh:mm:ss a", Locale.getDefault())
     private val timeFmt = SimpleDateFormat("hh:mm:ss a", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
+        settings = app.settingsStore.settings()
 
-        b.parkedList.layoutManager = LinearLayoutManager(this)
-        b.parkedList.adapter = parkedAdapter
-        b.parkedList.itemAnimator = null
-        b.leavingList.layoutManager = LinearLayoutManager(this)
-        b.leavingList.adapter = leavingAdapter
-        b.leavingList.itemAnimator = null
+        for ((list, adapter) in listOf(b.captureList to captureAdapter, b.parkedList to parkedAdapter, b.outList to outAdapter)) {
+            list.layoutManager = LinearLayoutManager(this)
+            list.adapter = adapter
+            list.itemAnimator = null
+        }
         modelNames.addAll(com.vehiclegate.anpr.core.VehicleModels.COMMON)
         modelAdapter = newModelAdapter()
         lifecycleScope.launch {
@@ -118,20 +135,180 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         }
         b.settingsButton.setOnClickListener { openSettings() }
         b.exitButton.setOnClickListener { confirmExit() }
+        b.manualButton.setOnClickListener { openManual() }
+        b.tabParked.setOnClickListener { showOut = false; refreshLists() }
+        b.tabOut.setOnClickListener { showOut = true; refreshLists() }
+        b.search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) = refreshLists()
+        })
         askPermissionsOnce()
 
         lifecycleScope.launch {
-            app.db.entries().parked().collect { list ->
-                parkedAdapter.submitList(list)
-                b.parkedCount.text = "${list.size} parked"
-                b.parkedEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+            app.db.captures().pendingFlow().collect { list -> pending = list; refreshCaptures() }
+        }
+        lifecycleScope.launch {
+            app.db.entries().openFlow().collect { list ->
+                parkedAll = list
+                refreshLists()
+                captureAdapter.notifyDataSetChanged() // "Parked · leaving?" badges
             }
         }
         lifecycleScope.launch {
-            app.db.entries().leaving().collect { list ->
-                leavingAdapter.submit(list)
-                b.leavingCount.text = "${list.size}"
-                b.leavingEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+            app.db.entries().recentOut(500).collect { list -> outAll = list; refreshLists() }
+        }
+        refreshLists()
+    }
+
+    // ------------------------------------------------------------------ counter lists
+
+    private fun refreshCaptures() {
+        val list = if (manualOpen) listOf(manualCapture()) + pending else pending
+        captureAdapter.submitList(list)
+        b.captureCount.text = "${pending.size}"
+        b.captureEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+        // the opened card was checked in / ignored / expired
+        val open = captureAdapter.expandedId
+        if (open != null && list.none { it.id == open }) captureAdapter.expand(null)
+    }
+
+    private fun manualCapture() = Capture(
+        id = CaptureAdapter.MANUAL_ID, plate = "", plateFormatted = "", firstSeen = 0, lastSeen = 0,
+        reads = 0, readings = "", snapshotPath = null, confidence = 1f, cameraSummary = ParkingDesk.MANUAL
+    )
+
+    private fun openManual() {
+        manualOpen = true
+        refreshCaptures()
+        b.captureList.scrollToPosition(0)
+    }
+
+    /** Parked / Checked out list with search. Digits typed = token first. */
+    private fun refreshLists() {
+        b.tabParked.isSelected = !showOut
+        b.tabOut.isSelected = showOut
+        b.tabParked.text = "Parked · ${parkedAll.size}"
+        b.parkedList.visibility = if (showOut) View.GONE else View.VISIBLE
+        b.outList.visibility = if (showOut) View.VISIBLE else View.GONE
+        val q = b.search.text.toString().trim()
+        val source = if (showOut) outAll else parkedAll
+        val shown = if (q.isEmpty()) source.take(LIST_LIMIT)
+        else source.mapNotNull { e ->
+            com.vehiclegate.anpr.core.CaptureLogic.rank(q, e.plate, e.name?.ifBlank { e.token } ?: e.token, e.model)?.let { it to e }
+        }.sortedWith(compareBy<Pair<Int, VehicleEntry>> { it.first }.thenByDescending { it.second.exitTime ?: it.second.entryTime })
+            .map { it.second }
+        if (showOut) outAdapter.submitList(shown) else parkedAdapter.submitList(shown)
+        b.listNote.text = when {
+            q.isNotEmpty() -> "${shown.size} found for \"$q\"" + if (q.all { it.isDigit() }) " · token numbers first" else ""
+            showOut -> "Latest ${shown.size} check-outs · search to find older ones"
+            source.size > shown.size -> "Latest ${shown.size} of ${source.size} parked · search token, number or name"
+            else -> "${source.size} parked · type in a row to edit · Check out = tap twice"
+        }
+        b.listEmpty.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
+        b.listEmpty.text = when {
+            q.isNotEmpty() -> "Nothing found for \"$q\""
+            showOut -> "No check-outs yet."
+            else -> "No vehicles parked."
+        }
+    }
+
+    // ------------------------------------------------------------------ CaptureAdapter.Host
+
+    override fun parkedFor(c: Capture): VehicleEntry? = app.parking.parkedMatch(c, parkedAll)
+
+    override fun amountFor(e: VehicleEntry) = app.parking.amountDue(e, settings)
+
+    override fun modelSuggestions() = modelAdapter
+
+    override fun lookup(c: Capture, typed: String, show: (String, ParkingDesk.Hint) -> Unit) {
+        lookupJob?.cancel()
+        lookupJob = lifecycleScope.launch {
+            val hint = withContext(Dispatchers.IO) { app.parking.hint(typed, settings) }
+            if (hint is ParkingDesk.Hint.Monthly && hint.exact && hint.member.plate !in parkedAll.map { it.plate }) {
+                // Monthly user typed / picked → checked in straight away
+                checkIn(c, typed, "", "", auto = true)
+                return@launch
+            }
+            val text = when (hint) {
+                is ParkingDesk.Hint.Monthly -> "Monthly user? ${hint.member.name} (${hint.member.plate}) – Check in uses that number"
+                is ParkingDesk.Hint.Parked -> "Already parked since ${shortTime(hint.entry.entryTime)} · ${hint.entry.whoText()}" +
+                    if (hint.entry.isMonthly) " · monthly" else " · collect ₹${hint.amount}"
+                is ParkingDesk.Hint.Regular -> "Regular: " + listOf(hint.name, hint.model).filter { it.isNotBlank() }.joinToString(" · ")
+                ParkingDesk.Hint.None -> if (typed.filter { it.isLetterOrDigit() }.length >= 4) "New vehicle" else ""
+            }
+            show(text, hint)
+        }
+    }
+
+    override fun checkIn(c: Capture, plate: String, who: String, model: String) = checkIn(c, plate, who, model, auto = false)
+
+    private fun checkIn(c: Capture, plate: String, who: String, model: String, auto: Boolean) {
+        val manual = c.id == CaptureAdapter.MANUAL_ID
+        lifecycleScope.launch {
+            val dup = withContext(Dispatchers.IO) { app.parking.duplicateToken(who) }
+            val (entry, err) = withContext(Dispatchers.IO) {
+                app.parking.checkIn(if (manual) null else c, plate, who, model)
+            }
+            if (entry == null) { b.lastEvent.text = err ?: "Not checked in"; return@launch }
+            if (model.isNotBlank()) addModelSuggestion(model)
+            hideKeyboard()
+            b.root.isFocusableInTouchMode = true
+            b.root.requestFocus()
+            if (manual) { manualOpen = false; refreshCaptures() }
+            captureAdapter.expand(null)
+            b.lastEvent.text = when {
+                entry.isMonthly -> "Monthly user checked in${if (auto) " automatically" else ""}: ${entry.plateFormatted} · ${entry.whoText()}"
+                dup != null -> "Checked in ${entry.plateFormatted} – but token $who is also given to ${dup.plateFormatted}"
+                else -> "Checked in: ${entry.plateFormatted} · ${entry.whoText()}"
+            }
+            b.parkedList.scrollToPosition(0)
+        }
+    }
+
+    override fun checkOut(c: Capture, parked: VehicleEntry) {
+        lifecycleScope.launch {
+            val out = withContext(Dispatchers.IO) { app.parking.checkOutFromCapture(c, parked, settings) }
+            hideKeyboard()
+            captureAdapter.expand(null)
+            b.lastEvent.text = "Checked out: ${out.plateFormatted}" + if (out.isMonthly) " (monthly)" else " · collected ₹${out.amount ?: 0}"
+        }
+    }
+
+    override fun ignore(c: Capture) {
+        if (c.id == CaptureAdapter.MANUAL_ID) {
+            manualOpen = false; hideKeyboard(); refreshCaptures(); return
+        }
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { app.parking.ignore(c) }
+            hideKeyboard()
+            captureAdapter.expand(null)
+        }
+    }
+
+    override fun photo(c: Capture) = showPicture(c.snapshotPath, "${c.plateFormatted}  ·  ${shortTime(c.firstSeen)}  ·  ${c.reads} reads")
+
+    // small pictures for the capture cards
+    private val thumbCache = android.util.LruCache<String, android.graphics.Bitmap>(40)
+    private val thumbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    override fun loadThumb(path: String?, into: ImageView) {
+        into.tag = path
+        if (path == null) { into.setImageResource(R.drawable.ic_photo); into.scaleType = ImageView.ScaleType.CENTER; return }
+        into.scaleType = ImageView.ScaleType.CENTER_CROP
+        thumbCache.get(path)?.let { into.setImageBitmap(it); return }
+        into.setImageDrawable(null)
+        thumbExecutor.execute {
+            val bmp = try {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(path, o)
+                var sample = 1
+                while (o.outWidth / (sample * 2) >= 320) sample *= 2
+                BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+            } catch (_: Exception) { null }
+            handler.post {
+                if (bmp != null) thumbCache.put(path, bmp)
+                if (into.tag == path) { if (bmp != null) into.setImageBitmap(bmp) else into.setImageResource(R.drawable.ic_photo) }
             }
         }
     }
@@ -140,6 +317,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         super.onStart()
         settings = app.settingsStore.settings()
         b.title.text = settings.siteTitle
+        refreshLists()
         val cameras = app.settingsStore.cameras().filter { it.enabled && it.url.isNotBlank() }
         buildTiles(cameras)
         if (cameras.isEmpty()) b.lastEvent.text = getString(R.string.no_cameras).replace("\n", " ")
@@ -308,10 +486,10 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         t.lastRead.postDelayed(t.hideRead, 4000)
     }
 
-    // ------------------------------------------------------------------ latest vehicle
+    // ------------------------------------------------------------------ pipeline events
 
-    override fun onVehicleLeaving(entry: VehicleEntry) {
-        b.lastEvent.text = "Leaving: ${entry.plateFormatted} – collect ₹${entry.amount ?: 0} and press Check out"
+    override fun onCaptured(capture: Capture, isNew: Boolean) {
+        if (isNew) b.lastEvent.text = "Captured ${capture.plateFormatted} at ${shortTime(capture.firstSeen)} – select it to check in"
     }
 
     override fun onAutoCheckedOut(entry: VehicleEntry) {
@@ -319,9 +497,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
     }
 
     override fun onVehicleSaved(entry: VehicleEntry) {
-        b.lastEvent.text = "Checked in: ${entry.plateFormatted} at ${timeFmt.format(Date(entry.entryTime))}" +
-            if (entry.isMonthly) " (monthly user)" else ""
-        b.parkedList.scrollToPosition(0)
+        b.lastEvent.text = "Monthly user checked in automatically: ${entry.plateFormatted} · ${entry.whoText()}"
     }
 
     // ------------------------------------------------------------------ parking actions
@@ -360,46 +536,19 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             .hideSoftInputFromWindow(b.root.windowToken, 0)
     }
 
-    /** Tap a parked vehicle: edit token/name, or check it out by hand. */
-    private fun editParked(e: VehicleEntry) {
-        val d = com.vehiclegate.anpr.databinding.DialogEntryBinding.inflate(layoutInflater)
-        val settings = app.settingsStore.settings()
-        val due = app.parking.amountDue(e, settings)
-        d.info.text = "Checked in ${dateFmt.format(Date(e.entryTime))} ${timeFmt.format(Date(e.entryTime))}" +
-            " · parked ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, System.currentTimeMillis())}" +
-            if (e.isMonthly) " · MONTHLY user" else " · due now ₹$due"
-        d.plate.setText(e.plateFormatted)
-        d.name.setText(e.name?.takeIf { it.isNotBlank() } ?: e.token ?: "")
-        d.model.setText(e.model ?: "")
-        d.model.setAdapter(newModelAdapter())
-        e.snapshotPath?.let { path ->
-            lifecycleScope.launch {
-                val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
-                if (bmp != null) { d.photo.setImageBitmap(bmp); d.photo.visibility = View.VISIBLE }
-            }
+    private fun checkOut(e: VehicleEntry) {
+        lifecycleScope.launch {
+            val out = withContext(Dispatchers.IO) { app.parking.checkOut(app.db.entries().get(e.id) ?: e, settings) }
+            b.lastEvent.text = "Checked out: ${out.plateFormatted}" + if (out.isMonthly) " (monthly)" else " · collected ₹${out.amount ?: 0}"
         }
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle(e.plateFormatted)
-            .setView(d.root)
-            .setPositiveButton("Save") { _, _ -> lifecycleScope.launch { saveDialog(e, d) } }
-            .setNeutralButton(if (e.isMonthly) "Check out" else "Check out ₹$due") { _, _ ->
-                lifecycleScope.launch {
-                    if (saveDialog(e, d)) withContext(Dispatchers.IO) {
-                        app.parking.checkOut(app.db.entries().get(e.id) ?: e, settings)
-                    }
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     /** Captured picture of the vehicle (plate boxed), large. Tap anywhere to close. */
-    private fun showPhoto(e: VehicleEntry) {
-        val path = e.snapshotPath
-        if (path == null) { b.lastEvent.text = "No picture saved for ${e.plateFormatted}"; return }
+    private fun showPicture(path: String?, title: String) {
+        if (path == null) { b.lastEvent.text = "No picture saved"; return }
         lifecycleScope.launch {
             val bmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }
-            if (bmp == null) { b.lastEvent.text = "Picture of ${e.plateFormatted} is no longer stored"; return@launch }
+            if (bmp == null) { b.lastEvent.text = "The picture is no longer stored"; return@launch }
             val dlg = android.app.Dialog(this@MainActivity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
             val box = android.widget.LinearLayout(this@MainActivity).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
@@ -407,8 +556,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
                 setPadding(16, 16, 16, 16)
             }
             box.addView(TextView(this@MainActivity).apply {
-                text = "${e.plateFormatted}   ·   ${dateFmt.format(Date(e.entryTime))}  ${timeFmt.format(Date(e.entryTime))}" +
-                    "   ·   ${e.whoText()}      (tap to close)"
+                text = "$title      (tap to close)"
                 setTextColor(0xFFFFFFFF.toInt()); textSize = 18f; setPadding(8, 4, 8, 12)
             })
             box.addView(ImageView(this@MainActivity).apply {
@@ -431,61 +579,17 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
         }
     }
 
-    /** Saves the edit dialog: corrected plate number, Token/Name, model. False if the number is invalid. */
-    private suspend fun saveDialog(e: VehicleEntry, d: com.vehiclegate.anpr.databinding.DialogEntryBinding): Boolean {
-        val plate = d.plate.text.toString(); val who = d.name.text.toString(); val model = d.model.text.toString()
-        val err = withContext(Dispatchers.IO) {
-            val error = app.parking.correctPlate(e, plate)
-            app.parking.saveDetails(e, who, model)
-            error
-        }
-        if (model.isNotBlank()) addModelSuggestion(model)
-        if (err != null) {
-            android.widget.Toast.makeText(this, "Number not changed: $err", android.widget.Toast.LENGTH_LONG).show()
-            return false
-        }
-        return true
-    }
-
-    /** Leaving vehicle: show the amount, staff collects money and confirms. */
-    private fun confirmCheckout(e: VehicleEntry) {
-        val settings = app.settingsStore.settings()
-        val amount = app.parking.amountDue(e, settings)
-        val out = e.exitDetectedAt ?: System.currentTimeMillis()
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("${e.plateFormatted} – collect ₹$amount")
-            .setMessage("${e.whoText()}\nIn: ${dateFmt.format(Date(e.entryTime))} ${timeFmt.format(Date(e.entryTime))}" +
-                "\nOut: ${timeFmt.format(Date(out))}\nParked: ${com.vehiclegate.anpr.core.ParkingFee.duration(e.entryTime, out)}" +
-                "\nFee: ₹${settings.feeAmount} per ${settings.feePeriodHours} h")
-            .setPositiveButton("Collected ₹$amount – Check out") { _, _ ->
-                lifecycleScope.launch { withContext(Dispatchers.IO) { app.parking.checkOut(e, settings) } }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    /** Long-press a parked vehicle: remove a wrong read. */
+    /** Long-press a parked vehicle: remove a wrong entry. */
     private fun confirmDelete(e: VehicleEntry) {
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Delete ${e.plateFormatted}?")
-            .setMessage("Use this only for a wrong read (no such vehicle). It is removed from the records.")
+            .setMessage("Use this only for a wrong entry (no such vehicle). It is removed from the records.")
             .setPositiveButton("Delete") { _, _ ->
                 lifecycleScope.launch { withContext(Dispatchers.IO) { app.db.entries().delete(e) } }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
-
-    /** "Gate Cam 1|TN 09 AB 1234|92|3|1" lines → aligned comparison text. */
-    private fun formatCameraSummary(summary: String): String =
-        summary.lines().filter { it.isNotBlank() }.joinToString("\n") { line ->
-            val p = line.split("|")
-            if (p.size < 5) line
-            else {
-                val mark = if (p[4] == "1") "✔" else "✘"
-                "$mark ${p[0].take(14).padEnd(14)}  ${p[1].padEnd(14)}  ${p[2].padStart(3)}%  ×${p[3]}"
-            }
-        }
 
     // ------------------------------------------------------------------ clock & today count
 
@@ -506,6 +610,11 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events {
             }
             handler.postDelayed(this, 1000 - now % 1000)
         }
+    }
+
+    companion object {
+        /** Parked / checked-out rows shown without a search */
+        private const val LIST_LIMIT = 15
     }
 
     private fun startOfDay(ms: Long): Long = Calendar.getInstance().apply {

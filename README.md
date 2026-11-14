@@ -74,19 +74,18 @@ Live tiles at the bottom of the TV screen show each camera with a status dot (gr
 
 ## Parking: check-in, check-out, fees, monthly users
 
-* **Dashboard:** **CHECK-IN** list on the left (green), **CHECK-OUT** list on the right (red). Columns: Vehicle No. · Token / Name · Model · Date & Time.
-* **Check-in:** a vehicle seen for the first time appears at the top of the CHECK-IN list. Type the **Token or Name** (one field) and **Model** straight into the row; each field is saved when you move to the next field or press Enter/OK. Model suggestions appear while typing (common models + every model typed before). Next time the same vehicle comes in, Token/Name and Model are filled in automatically from its last visit (also when the plate was read one character off) – nothing to type.
-* **Everything is edited in the row – no pop-ups:** vehicle number, Token/Name, Model. **Out** = vehicle leaving by hand (moves it to CHECK-OUT). Long-press the date/time to delete a wrong read. **📷** (or tap the date/time; in CHECK-OUT tap the details line) shows the captured picture full screen.
-* **Wrong number read?** Type the correct number over it in the row (check-in or check-out list) and press Enter/OK. The app remembers the correction: when the cameras read the same wrong number again, it is saved as the corrected number automatically.
-* **Vehicle details (make/owner):** not fetched online. Free public RC lookup does not exist, paid Vahan RC APIs need a business agreement, and owner data is personal data. Enter the model once – it is remembered for the next visit.
-* **Rule:** not checked in → **check in** (also right after a check-out – that is a new visit). Checked in → **leaving**.
-* Typing: tap a box, the keyboard opens and you type in the box itself. It saves by itself a moment after you stop typing (the vehicle number saves when you leave the box or tap outside).
-  * Daily vehicles go to **CHECK-OUT** with the amount due. Collect the money, press **Check out ₹…**, then confirm. **✕** = not actually leaving (returns it to Parked).
-  * **Monthly users** are checked out automatically (₹0).
-* **Fee:** ₹10 for every started 24 h by default (2 h = ₹10, 25 h = ₹20). Change the amount and period in *Settings → Parking*.
-* **Monthly users:** *Settings → Parking → Monthly users* holds the master list: vehicle number, name, phone and an optional valid-till date. Their vehicles show in **purple** with a MONTHLY tag.
-* **Check-in list:** tap the vehicle number to see the photo, edit its token/name or check it out by hand. Long-press to delete a wrong read.
-* The header shows **In today** and **Out today · ₹ collected**. *Export history (CSV)* includes token, name, in/out times, status and amount. *Backup settings* also saves the monthly users list.
+**Counter screen**
+* **CAPTURED (left):** every vehicle the cameras read waits here – it is *not* checked in yet. Different readings of the same vehicle (a bike standing at the gate read several ways) are merged into one card: best number, "Also read: …", picture, time, number of reads. Tap a card → pick the right reading (chips) or correct the number, type Token / Name (and Model) → **Check in**. **Ignore** removes junk. Unhandled cards disappear after 45 min. The check-in time is when the camera first saw the vehicle.
+* **+ Check in:** manual check-in for vehicles the cameras can't see (e.g. parked outside). Marked "manual".
+* While a number is typed it is looked up: **monthly user → checked in automatically**, already parked → the button becomes **Check out ₹…**, regular → name and model filled in.
+* A card that is a vehicle already parked shows **Parked · leaving?** – open it and press **Check out ₹…**.
+* **PARKED (right):** latest 15 parked vehicles, **search** for the rest. Digits typed = **token numbers first**, then plate numbers, then names. Edit number / Token / Name / Model in the row. **Check out** = tap twice (first tap shows the amount). Long-press the time = delete a wrong entry.
+* **Checked out tab:** latest 15 check-outs (search for older ones). **Undo** if checked out by mistake.
+* Corrections are remembered: a reading staff corrected is fixed automatically next time.
+
+**Monthly users** (*Settings → Parking → Monthly users*) are checked in and out automatically when the cameras read their number (exact, or one character off when only one member is that close). Seen again within the minimum stay = still at the gate.
+
+**Fee:** ₹10 for every started 24 h by default (2 h = ₹10, 25 h = ₹20). *Settings → Parking*.
 
 ## 4. Background scanning
 
