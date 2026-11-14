@@ -234,6 +234,11 @@ class AnprCoreTest {
         val alt = VoiceParse.parse(listOf("hello", "TN 01 AB 1234"), models)!!
         assertEquals("TN01AB1234", alt.plate?.compact)
 
+        // the English recogniser splits colloquial Tamil numbers into two words
+        val split = VoiceParse.parse(listOf("TN 23 AU anju ombodhu ezhu moonu token pathi nonu"), models)!!
+        assertEquals("TN23AU5973", split.plate?.compact)
+        assertEquals("11", split.who)
+        assertEquals("TN23AU5973", VoiceParse.parse(listOf("TN iru bathi moonu AU 5973"), models)!!.plate?.compact)
         assertEquals("11", VoiceParse.searchText(listOf("token pathinonu")))
         assertEquals("29", VoiceParse.searchText(listOf("இருபத்தி ஒன்பது")))
         assertTrue(VoiceParse.matchModels("ஆக்டிவா", models).first().contains("Activa"))

@@ -363,7 +363,9 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
 
     override fun speakPlate(fill: (String) -> Unit) {
         hideKeyboard()
-        voice.listen(settings.voiceLanguage, "say the bike number") { alts ->
+        // the number is taken with the English recogniser: letters and digits come back as said
+        // (colloquial Tamil numbers like "pathinonu" are still understood)
+        voice.listen("en-IN", "say the bike number") { alts ->
             val s = com.vehiclegate.anpr.core.VoiceParse.parse(alts, emptyList())
             val p = s?.plate
             b.lastEvent.text = "Heard: \"${alts.first()}\"" + if (p == null) " – no bike number found, speak again or type it" else ""

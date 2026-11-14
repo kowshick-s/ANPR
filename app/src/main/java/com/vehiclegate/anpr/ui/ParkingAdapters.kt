@@ -432,7 +432,7 @@ class CheckInAdapter(
         h.nameText.text = who ?: "–"
         h.nameText.setTextColor(ContextCompat.getColor(ctx, if (who != null) R.color.text else R.color.text_dim))
         val now = System.currentTimeMillis()
-        h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))}\n${ParkingFee.duration(e.entryTime, now)} parked" +
+        h.whenText.text = "${dateTimeFmt.format(Date(e.entryTime))} · ${ParkingFee.duration(e.entryTime, now)}" +
             (if (e.isMonthly) " · monthly" else "") +
             (if (e.cameraSummary == ParkingDesk.MANUAL) " · manual" else "")
         h.whenText.setTextColor(ContextCompat.getColor(ctx, if (e.isMonthly) R.color.monthly_text else R.color.text_dim))

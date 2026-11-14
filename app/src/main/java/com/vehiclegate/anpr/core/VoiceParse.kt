@@ -207,6 +207,26 @@ object VoiceParse {
             // a tens stem joined with a unit ("irubathimoonu", "இருபத்திமூணு", "இருபத்தொன்னு")
             val joined = joinedNumber(sw)
             if (joined != null) { out += Tok.Num(joined.toString().repeat(repeat), w); repeat = 1; i++; continue }
+            // a colloquial number the recogniser split into two words ("pathi nonu", "iru bathu")
+            if (i + 1 < words.size && sw.length >= 2 && !w.all { it.isDigit() }) {
+                val next = words[i + 1]
+                if (!next.all { it.isDigit() }) {
+                    val two = simp(latin + (if (isTamil(next)) translit(next) else next))
+                    val v = NUMBERS[two] ?: joinedNumber(two) ?: number(two)?.takeIf { two.length >= 5 }
+                    if (v != null && simp(next).let { number(it) == null || it.length <= 2 }) {
+                        var value = v
+                        var used = 2
+                        // "iru bathi moonu" → 23
+                        if (v in 20..90 && v % 10 == 0 && i + 2 < words.size) {
+                            val after = words[i + 2].let { if (isTamil(it)) translit(it) else it }
+                            val unit = number(simp(after))
+                            if (unit != null && unit in 1..9) { value += unit; used = 3 }
+                        }
+                        out += Tok.Num(value.toString().repeat(repeat), words.subList(i, i + used).joinToString(" "))
+                        repeat = 1; i += used; continue
+                    }
+                }
+            }
 
             // letters: Tamil letter names (possibly run together: "டிஎன்"), English letter names
             if (isTamil(w)) {
