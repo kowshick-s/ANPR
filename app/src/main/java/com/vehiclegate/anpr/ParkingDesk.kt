@@ -45,7 +45,10 @@ class ParkingDesk(private val app: AnprApp) {
     sealed class Hint {
         object None : Hint()
         class Monthly(val member: MonthlyMember, val exact: Boolean) : Hint()
+        /** Exactly this number is parked. */
         class Parked(val entry: VehicleEntry, val amount: Int) : Hint()
+        /** One character different from a parked vehicle: may be a misread of it, or a different bike. */
+        class Near(val entry: VehicleEntry, val amount: Int) : Hint()
         class Regular(val name: String, val model: String) : Hint()
     }
 
@@ -172,7 +175,9 @@ class ParkingDesk(private val app: AnprApp) {
     suspend fun hint(typed: String, s: AppSettings): Hint {
         val (compact, _) = normalize(typed) ?: return Hint.None
         val now = System.currentTimeMillis()
-        dao.openSessions().firstOrNull { same(it.plate, compact) }?.let { return Hint.Parked(it, amountDue(it, s)) }
+        val open = dao.openSessions()
+        open.firstOrNull { it.plate == compact }?.let { return Hint.Parked(it, amountDue(it, s)) }
+        open.firstOrNull { same(it.plate, compact) }?.let { return Hint.Near(it, amountDue(it, s)) }
         monthlyMemberFor(compact, now)?.let { return Hint.Monthly(it, it.plate == compact) }
         val (name, model) = previousDetails(compact)
         if (name.isNotBlank() || model.isNotBlank()) return Hint.Regular(name, model)
@@ -185,7 +190,8 @@ class ParkingDesk(private val app: AnprApp) {
      */
     suspend fun checkIn(c: Capture?, typed: String, who: String, model: String): Pair<VehicleEntry?, String?> {
         val (compact, formatted) = normalize(typed) ?: return null to "Enter the full vehicle number"
-        val open = dao.openSessions().firstOrNull { same(it.plate, compact) }
+        // Only the exact number blocks: staff decide when a number is one character off a parked one.
+        val open = dao.openSessions().firstOrNull { it.plate == compact }
         if (open != null) return null to "${open.plateFormatted} is already parked – check it out instead"
         val now = System.currentTimeMillis()
         val member = monthlyMemberFor(compact, now)

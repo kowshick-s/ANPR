@@ -248,6 +248,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
                 is ParkingDesk.Hint.Monthly -> "Monthly user? ${hint.member.name} (${hint.member.plate}) – Check in uses that number"
                 is ParkingDesk.Hint.Parked -> "Already parked since ${shortTime(hint.entry.entryTime)} · ${hint.entry.whoText()}" +
                     if (hint.entry.isMonthly) " · monthly" else " · collect ₹${hint.amount}"
+                is ParkingDesk.Hint.Near -> "Close to parked ${hint.entry.plateFormatted}"
                 is ParkingDesk.Hint.Regular -> "Regular: " + listOf(hint.name, hint.model).filter { it.isNotBlank() }.joinToString(" · ")
                 ParkingDesk.Hint.None -> if (typed.filter { it.isLetterOrDigit() }.length >= 4) "New vehicle" else ""
             }

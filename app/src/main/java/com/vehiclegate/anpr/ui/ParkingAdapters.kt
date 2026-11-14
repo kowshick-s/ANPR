@@ -111,6 +111,8 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
         val editModel: AutoCompleteTextView = v.findViewById(R.id.editModel)
         val editHint: TextView = v.findViewById(R.id.editHint)
         val ignore: Button = v.findViewById(R.id.ignore)
+        /** The other choice when the number is one character off a parked vehicle. */
+        val alt: Button = v.findViewById(R.id.alt)
         val confirm: Button = v.findViewById(R.id.confirm)
 
         var capture: Capture? = null
@@ -151,12 +153,27 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
             host.lookup(c, typed) { text, hint ->
                 if (capture?.id != forId) return@lookup
                 val cp = cardParked
+                alt.visibility = View.GONE
                 when {
+                    // exactly this number is parked → leaving
                     hint is ParkingDesk.Hint.Parked -> { editHint.text = text; showParked(hint.entry) }
+                    // staff typed / picked a number one character off a parked one: trust staff → Check in,
+                    // with "Out" for the parked one as the other choice
+                    userEdited && hint is ParkingDesk.Hint.Near -> {
+                        editHint.text = "1 character different from parked ${hint.entry.plateFormatted} (${hint.entry.whoText()}). " +
+                            "Different vehicle → Check in. Same vehicle → Out."
+                        showParked(null)
+                        showAlt("Out · ${hint.entry.plateFormatted}") { host.checkOut(capture ?: return@showAlt, hint.entry) }
+                    }
+                    // camera reading close to a parked vehicle → most likely it is leaving; Check in is the other choice
                     !userEdited && cp != null -> {
-                        // the best reading is wrong but another reading matches a parked vehicle
-                        editHint.text = "Same vehicle as parked ${cp.plateFormatted} (${cp.whoText()}) – leaving"
+                        editHint.text = "Close to parked ${cp.plateFormatted} (${cp.whoText()}) – probably leaving. " +
+                            "If it is a different vehicle, correct the number or press Check in as new."
                         showParked(cp)
+                        showAlt("Check in as new") {
+                            val c = capture ?: return@showAlt
+                            host.checkIn(c, editPlate.text.toString(), editName.text.toString(), editModel.text.toString())
+                        }
                     }
                     else -> { editHint.text = text; showParked(null) }
                 }
@@ -165,6 +182,12 @@ class CaptureAdapter(private val host: Host) : ListAdapter<Capture, CaptureAdapt
                     if (editModel.text.isNullOrBlank() && !editModel.hasFocus()) editModel.setText(hint.model, false)
                 }
             }
+        }
+
+        fun showAlt(label: String, action: () -> Unit) {
+            alt.text = label
+            alt.visibility = View.VISIBLE
+            alt.setOnClickListener { action() }
         }
 
         fun showParked(p: VehicleEntry?) {
