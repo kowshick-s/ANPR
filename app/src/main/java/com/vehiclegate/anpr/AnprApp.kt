@@ -13,6 +13,7 @@ class AnprApp : Application() {
     override fun onCreate() {
         super.onCreate()
         applyTheme(settingsStore.settings().themeMode)
+        com.vehiclegate.anpr.backup.BackupWorker.schedule(this)
     }
 
     companion object {

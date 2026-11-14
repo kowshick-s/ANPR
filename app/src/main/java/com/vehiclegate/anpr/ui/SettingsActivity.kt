@@ -58,6 +58,28 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, UsersActivity::class.java)
                 .putExtra(EXTRA_ADMIN_OK, app.session.isAdmin || intent.getBooleanExtra(EXTRA_ADMIN_OK, false)))
         }
+        // emergency backup by email
+        val backup = com.vehiclegate.anpr.backup.BackupStore(this)
+        b.backupEnabled.isChecked = backup.enabled
+        b.backupGmail.setText(backup.gmail)
+        b.backupAlsoTo.setText(backup.alsoTo)
+        if (backup.appPassword.isNotEmpty()) b.backupPassword.hint = "saved – type to change"
+        b.backupStatus.text = backup.lastResult
+        fun saveBackup() {
+            backup.enabled = b.backupEnabled.isChecked
+            backup.gmail = b.backupGmail.text.toString()
+            backup.alsoTo = b.backupAlsoTo.text.toString()
+            b.backupPassword.text.toString().takeIf { it.isNotBlank() }?.let { backup.appPassword = it }
+        }
+        b.backupEnabled.setOnCheckedChangeListener { _, _ -> saveBackup() }
+        b.backupNow.setOnClickListener {
+            saveBackup()
+            b.backupStatus.text = "Sending…"
+            lifecycleScope.launch {
+                val err = withContext(Dispatchers.IO) { com.vehiclegate.anpr.backup.BackupWorker.sendBackup(app, force = true) }
+                b.backupStatus.text = if (err == null) backup.lastResult else "Not sent: $err"
+            }
+        }
         b.monthlyUsers.setOnClickListener { startActivity(android.content.Intent(this, MonthlyUsersActivity::class.java)) }
         b.importSettings.setOnClickListener {
             try {
@@ -363,6 +385,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun save() {
+        com.vehiclegate.anpr.backup.BackupStore(this).apply {
+            enabled = b.backupEnabled.isChecked
+            gmail = b.backupGmail.text.toString()
+            alsoTo = b.backupAlsoTo.text.toString()
+            b.backupPassword.text.toString().takeIf { it.isNotBlank() }?.let { appPassword = it }
+        }
         val d = AppSettings()
         app.settingsStore.saveSettings(
             AppSettings(

@@ -527,10 +527,26 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
         startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ADMIN_OK, true))
     }
 
+    /** Emergency: the parked list as a PDF → print, WhatsApp, Drive, email… */
+    private fun sharePdf() {
+        b.lastEvent.text = "Preparing the parked list…"
+        lifecycleScope.launch {
+            val r = withContext(Dispatchers.IO) { com.vehiclegate.anpr.backup.BackupReport(app).build() }
+            val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.files", r.pdf)
+            val send = Intent(Intent.ACTION_SEND).setType("application/pdf")
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .putExtra(Intent.EXTRA_SUBJECT, "Parked vehicles – ${r.parked.size}")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(send, "Print or share the parked list"))
+            b.lastEvent.text = "Parked list: ${r.parked.size} vehicles"
+        }
+    }
+
     /** Logged-in user: switch user; admins also open the TV dashboard / users. */
     private fun userMenu() {
         val menu = androidx.appcompat.widget.PopupMenu(this, b.userChip)
         menu.menu.add(0, 1, 0, "Switch user")
+        menu.menu.add(0, 4, 3, "Print / share parked list (PDF)")
         if (app.session.isAdmin) {
             menu.menu.add(0, 2, 1, "TV dashboard")
             menu.menu.add(0, 3, 2, "Users & roles")
@@ -545,6 +561,7 @@ class MainActivity : AppCompatActivity(), AnprPipeline.Events, CaptureAdapter.Ho
                 }
                 2 -> startActivity(Intent(this, DashboardActivity::class.java))
                 3 -> startActivity(Intent(this, UsersActivity::class.java))
+                4 -> sharePdf()
             }
             true
         }

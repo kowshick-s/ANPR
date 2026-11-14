@@ -105,6 +105,10 @@ interface VehicleEntryDao {
     @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime IS NOT NULL ORDER BY exitTime DESC LIMIT :limit")
     fun recentOut(limit: Int): Flow<List<VehicleEntry>>
 
+    /** Visits that came in or went out since [t] (today's report). */
+    @Query("SELECT * FROM vehicle_entries WHERE entryTime >= :t OR exitTime >= :t")
+    suspend fun since(t: Long): List<VehicleEntry>
+
     /** Checked-out visits whose pictures are past the keep period. */
     @Query("SELECT * FROM vehicle_entries WHERE status = 'OUT' AND exitTime < :before AND snapshotPath IS NOT NULL")
     suspend fun picturesToDrop(before: Long): List<VehicleEntry>
